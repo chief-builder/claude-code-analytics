@@ -2,6 +2,8 @@
 
 A local web dashboard for analyzing Claude Code usage data from your `~/.claude` directory.
 
+**[View Screenshots & Demo](https://chief-builder.github.io/claude-code-analytics/)**
+
 ## Overview
 
 This single-file HTML dashboard provides comprehensive analytics for your Claude Code usage, including session tracking, token consumption, cost estimation, tool usage patterns, and project breakdowns. All data stays local - nothing is sent to any server.
