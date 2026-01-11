@@ -1388,10 +1388,18 @@
       `;
 
       const models = Object.keys(stats.modelUsage);
+      // Calculate total tokens per model for percentages
+      const modelTotals = models.map(m => (stats.modelUsage[m].inputTokens || 0) + (stats.modelUsage[m].outputTokens || 0));
+      const grandTotal = modelTotals.reduce((a, b) => a + b, 0);
+      const modelLabelsWithPct = models.map((m, i) => {
+        const pct = grandTotal > 0 ? ((modelTotals[i] / grandTotal) * 100).toFixed(1) : 0;
+        return `${m.split('-').slice(1, 3).join(' ')} (${pct}%)`;
+      });
+
       renderChart('tokensByModelChart', {
         type: 'bar',
         data: {
-          labels: models.map(m => m.split('-').slice(1, 3).join(' ')),
+          labels: modelLabelsWithPct,
           datasets: [
             {
               label: 'Input',
@@ -1408,10 +1416,16 @@
         options: getChartOptions('Tokens by Model')
       });
 
+      // Calculate cache percentages
+      const cacheTotal = totalCacheRead + totalCacheCreate + totalInputTokens;
+      const cacheReadPct = cacheTotal > 0 ? ((totalCacheRead / cacheTotal) * 100).toFixed(1) : 0;
+      const cacheCreatePct = cacheTotal > 0 ? ((totalCacheCreate / cacheTotal) * 100).toFixed(1) : 0;
+      const directInputPct = cacheTotal > 0 ? ((totalInputTokens / cacheTotal) * 100).toFixed(1) : 0;
+
       renderChart('cacheChart', {
         type: 'doughnut',
         data: {
-          labels: ['Cache Read', 'Cache Created', 'Direct Input'],
+          labels: [`Cache Read (${cacheReadPct}%)`, `Cache Created (${cacheCreatePct}%)`, `Direct Input (${directInputPct}%)`],
           datasets: [{
             data: [totalCacheRead, totalCacheCreate, totalInputTokens],
             backgroundColor: ['rgba(16, 185, 129, 0.8)', 'rgba(245, 158, 11, 0.8)', 'rgba(99, 102, 241, 0.8)'],
@@ -1653,13 +1667,26 @@
         return 'rgba(148, 163, 184, 0.8)'; // default gray
       };
 
+      // Limit to top 12 tools, group rest as "Other"
+      const topTools = sortedTools.slice(0, 12);
+      const otherTools = sortedTools.slice(12);
+      const otherTotal = otherTools.reduce((sum, t) => sum + t[1], 0);
+
+      const chartTools = otherTotal > 0 ? [...topTools, ['Other', otherTotal]] : topTools;
+
+      // Add percentages to tool labels
+      const toolLabelsWithPct = chartTools.map(t => {
+        const pct = realToolTotal > 0 ? ((t[1] / realToolTotal) * 100).toFixed(1) : 0;
+        return `${t[0]} (${pct}%)`;
+      });
+
       renderChart('toolTypesChart', {
         type: 'doughnut',
         data: {
-          labels: sortedTools.map(t => t[0]),
+          labels: toolLabelsWithPct,
           datasets: [{
-            data: sortedTools.map(t => t[1]),
-            backgroundColor: sortedTools.map(t => getToolColor(t[0])),
+            data: chartTools.map(t => t[1]),
+            backgroundColor: chartTools.map(t => getToolColor(t[0])),
             borderColor: 'var(--bg-primary)',
             borderWidth: 2
           }]
@@ -1862,10 +1889,16 @@
       const modelCounts = Object.keys(modelCallCounts).length > 0 ? Object.values(modelCallCounts) : [0];
       const modelColors = ['rgba(99, 102, 241, 0.8)', 'rgba(16, 185, 129, 0.8)', 'rgba(245, 158, 11, 0.8)', 'rgba(236, 72, 153, 0.8)'];
 
+      // Add percentages to API labels
+      const apiLabelsWithPct = modelLabels.map((m, i) => {
+        const pct = totalApiCalls > 0 ? ((modelCounts[i] / totalApiCalls) * 100).toFixed(1) : 0;
+        return `Messages API (${m}) (${pct}%)`;
+      });
+
       renderChart('apiTypeChart', {
         type: 'doughnut',
         data: {
-          labels: modelLabels.map(m => `Messages API (${m})`),
+          labels: apiLabelsWithPct,
           datasets: [{
             data: modelCounts,
             backgroundColor: modelColors.slice(0, modelLabels.length),
