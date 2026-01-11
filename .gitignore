@@ -1,0 +1,10 @@
+# Claude Code local data
+.claude/
+
+# OS files
+.DS_Store
+
+# Editor files
+*.swp
+*.swo
+*~

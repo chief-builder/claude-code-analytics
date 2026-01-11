@@ -1,0 +1,3061 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Claude Code Analytics</title>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+  <style>
+    :root {
+      --bg-primary: #0f172a;
+      --bg-secondary: #1e293b;
+      --bg-tertiary: #334155;
+      --text-primary: #f1f5f9;
+      --text-secondary: #94a3b8;
+      --accent: #6366f1;
+      --accent-hover: #818cf8;
+      --success: #10b981;
+      --warning: #f59e0b;
+      --error: #ef4444;
+      --border: #475569;
+    }
+
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+      background: var(--bg-primary);
+      color: var(--text-primary);
+      min-height: 100vh;
+    }
+
+    header {
+      background: var(--bg-secondary);
+      padding: 1rem 2rem;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      border-bottom: 1px solid var(--border);
+    }
+
+    header h1 {
+      font-size: 1.5rem;
+      font-weight: 600;
+    }
+
+    .header-actions {
+      display: flex;
+      gap: 1rem;
+      align-items: center;
+    }
+
+    button {
+      background: var(--accent);
+      color: white;
+      border: none;
+      padding: 0.5rem 1rem;
+      border-radius: 6px;
+      cursor: pointer;
+      font-size: 0.875rem;
+      transition: background 0.2s;
+    }
+
+    button:hover {
+      background: var(--accent-hover);
+    }
+
+    button:disabled {
+      background: var(--bg-tertiary);
+      cursor: not-allowed;
+    }
+
+    nav {
+      background: var(--bg-secondary);
+      padding: 0 2rem;
+      display: flex;
+      gap: 0;
+      border-bottom: 1px solid var(--border);
+    }
+
+    .tab {
+      padding: 1rem 1.5rem;
+      cursor: pointer;
+      color: var(--text-secondary);
+      border-bottom: 2px solid transparent;
+      transition: all 0.2s;
+    }
+
+    .tab:hover {
+      color: var(--text-primary);
+    }
+
+    .tab.active {
+      color: var(--accent);
+      border-bottom-color: var(--accent);
+    }
+
+    main {
+      padding: 2rem;
+      max-width: 1400px;
+      margin: 0 auto;
+    }
+
+    .view {
+      display: none;
+    }
+
+    .view.active {
+      display: block;
+    }
+
+    .summary-cards {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+      gap: 1rem;
+      margin-bottom: 2rem;
+    }
+
+    .card {
+      background: var(--bg-secondary);
+      border-radius: 8px;
+      padding: 1.5rem;
+      border: 1px solid var(--border);
+    }
+
+    .card-title {
+      color: var(--text-secondary);
+      font-size: 0.875rem;
+      margin-bottom: 0.5rem;
+    }
+
+    .card-value {
+      font-size: 2rem;
+      font-weight: 600;
+    }
+
+    .card-subtitle {
+      color: var(--text-secondary);
+      font-size: 0.75rem;
+      margin-top: 0.25rem;
+    }
+
+    .chart-container {
+      background: var(--bg-secondary);
+      border-radius: 8px;
+      padding: 1.5rem;
+      border: 1px solid var(--border);
+      margin-bottom: 1.5rem;
+    }
+
+    .chart-title {
+      font-size: 1rem;
+      font-weight: 600;
+      margin-bottom: 1rem;
+    }
+
+    .chart-wrapper {
+      position: relative;
+      height: 300px;
+    }
+
+    .grid-2 {
+      display: grid;
+      grid-template-columns: repeat(2, 1fr);
+      gap: 1.5rem;
+    }
+
+    @media (max-width: 900px) {
+      .grid-2 {
+        grid-template-columns: 1fr;
+      }
+    }
+
+    .empty-state {
+      text-align: center;
+      padding: 4rem 2rem;
+      color: var(--text-secondary);
+    }
+
+    .empty-state h2 {
+      font-size: 1.5rem;
+      margin-bottom: 1rem;
+      color: var(--text-primary);
+    }
+
+    .file-input-wrapper {
+      position: relative;
+      display: inline-block;
+    }
+
+    .file-input-wrapper input[type="file"] {
+      position: absolute;
+      left: 0;
+      top: 0;
+      opacity: 0;
+      cursor: pointer;
+      width: 100%;
+      height: 100%;
+    }
+
+    table {
+      width: 100%;
+      border-collapse: collapse;
+    }
+
+    th, td {
+      text-align: left;
+      padding: 0.75rem;
+      border-bottom: 1px solid var(--border);
+    }
+
+    th {
+      color: var(--text-secondary);
+      font-weight: 500;
+      font-size: 0.875rem;
+    }
+
+    .status-badge {
+      display: inline-block;
+      padding: 0.25rem 0.5rem;
+      border-radius: 4px;
+      font-size: 0.75rem;
+      font-weight: 500;
+    }
+
+    .status-success { background: rgba(16, 185, 129, 0.2); color: var(--success); }
+    .status-warning { background: rgba(245, 158, 11, 0.2); color: var(--warning); }
+
+    .metric-row {
+      display: flex;
+      justify-content: space-between;
+      padding: 0.75rem 0;
+      border-bottom: 1px solid var(--border);
+    }
+
+    .metric-row:last-child {
+      border-bottom: none;
+    }
+
+    .metric-label {
+      color: var(--text-secondary);
+    }
+
+    .metric-value {
+      font-weight: 600;
+    }
+
+    .export-buttons {
+      display: flex;
+      gap: 0.5rem;
+      margin-bottom: 1rem;
+    }
+
+    .export-buttons button {
+      background: var(--bg-tertiary);
+    }
+
+    .export-buttons button:hover {
+      background: var(--border);
+    }
+
+    .loading {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 2rem;
+      color: var(--text-secondary);
+    }
+
+    .custom-metric-form {
+      display: grid;
+      gap: 1rem;
+      margin-bottom: 1.5rem;
+    }
+
+    .form-group {
+      display: flex;
+      flex-direction: column;
+      gap: 0.5rem;
+    }
+
+    .form-group label {
+      font-size: 0.875rem;
+      color: var(--text-secondary);
+    }
+
+    .form-group input, .form-group select {
+      padding: 0.5rem;
+      border-radius: 4px;
+      border: 1px solid var(--border);
+      background: var(--bg-tertiary);
+      color: var(--text-primary);
+    }
+
+    .date-filter-bar {
+      background: var(--bg-secondary);
+      padding: 0.75rem 2rem;
+      display: flex;
+      align-items: center;
+      gap: 1rem;
+      border-bottom: 1px solid var(--border);
+      flex-wrap: wrap;
+    }
+
+    .date-filter-bar label {
+      color: var(--text-secondary);
+      font-size: 0.875rem;
+    }
+
+    .date-filter-bar input[type="date"] {
+      padding: 0.4rem 0.6rem;
+      border-radius: 4px;
+      border: 1px solid var(--border);
+      background: var(--bg-tertiary);
+      color: var(--text-primary);
+      font-size: 0.875rem;
+    }
+
+    .date-filter-bar input[type="date"]::-webkit-calendar-picker-indicator {
+      filter: invert(0.8);
+    }
+
+    .date-filter-bar button {
+      padding: 0.4rem 0.75rem;
+      font-size: 0.875rem;
+    }
+
+    .date-range-display {
+      color: var(--accent);
+      font-size: 0.875rem;
+      margin-left: auto;
+    }
+
+    .tool-detail-card {
+      background: var(--bg-tertiary);
+      border-radius: 6px;
+      padding: 1rem;
+      margin-bottom: 0.75rem;
+    }
+
+    .tool-detail-card h4 {
+      color: var(--text-primary);
+      margin-bottom: 0.5rem;
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+    }
+
+    .tool-detail-card p {
+      color: var(--text-secondary);
+      font-size: 0.85rem;
+      line-height: 1.5;
+    }
+
+    .tool-detail-card .tool-examples {
+      margin-top: 0.5rem;
+      font-size: 0.8rem;
+      color: var(--text-secondary);
+    }
+
+    .tool-detail-card .tool-examples code {
+      background: var(--bg-primary);
+      padding: 0.1rem 0.3rem;
+      border-radius: 3px;
+      font-family: monospace;
+    }
+  </style>
+</head>
+<body>
+  <header>
+    <h1>Claude Code Analytics</h1>
+    <div class="header-actions">
+      <span id="dataStatus" style="color: var(--text-secondary); font-size: 0.875rem;">No data loaded</span>
+      <div class="file-input-wrapper">
+        <button id="loadBtn">Load .claude Directory</button>
+        <input type="file" id="folderInput" webkitdirectory directory multiple>
+      </div>
+    </div>
+  </header>
+
+  <nav>
+    <div class="tab active" data-view="overview">Overview</div>
+    <div class="tab" data-view="sessions">Sessions</div>
+    <div class="tab" data-view="tokens">Tokens</div>
+    <div class="tab" data-view="tools">Tools</div>
+    <div class="tab" data-view="projects">Projects</div>
+    <div class="tab" data-view="network">Network</div>
+    <div class="tab" data-view="prompts">Prompts</div>
+    <div class="tab" data-view="custom">Custom Metrics</div>
+  </nav>
+
+  <div class="date-filter-bar" id="dateFilterBar" style="display: none;">
+    <label>From:</label>
+    <input type="date" id="dateFrom">
+    <label>To:</label>
+    <input type="date" id="dateTo">
+    <button onclick="applyDateFilter()">Apply Filter</button>
+    <button onclick="resetDateFilter()" style="background: var(--bg-tertiary);">Reset</button>
+    <span class="date-range-display" id="dateRangeDisplay"></span>
+  </div>
+
+  <main>
+    <!-- Overview View -->
+    <div id="overview" class="view active">
+      <div class="empty-state" id="overviewEmpty">
+        <h2>Welcome to Claude Code Analytics</h2>
+        <p>Load your ~/.claude directory to view usage statistics.</p>
+        <p style="margin-top: 1rem; font-size: 0.875rem;">Click "Load .claude Directory" and select your ~/.claude folder.</p>
+      </div>
+      <div id="overviewContent" style="display: none;">
+        <div class="summary-cards" id="summaryCards"></div>
+        <div class="grid-2">
+          <div class="chart-container">
+            <div class="chart-title">Daily Activity</div>
+            <div class="chart-wrapper"><canvas id="dailyActivityChart"></canvas></div>
+          </div>
+          <div class="chart-container">
+            <div class="chart-title">Hourly Distribution</div>
+            <div class="chart-wrapper"><canvas id="hourlyChart"></canvas></div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Sessions View -->
+    <div id="sessions" class="view">
+      <div class="summary-cards" id="sessionCards"></div>
+      <div class="chart-container">
+        <div class="chart-title">Sessions per Day</div>
+        <div class="chart-wrapper"><canvas id="sessionsChart"></canvas></div>
+      </div>
+      <div class="card">
+        <div class="chart-title">Session Statistics</div>
+        <div id="sessionStats"></div>
+      </div>
+      <div class="card" style="margin-top: 1.5rem;">
+        <div class="chart-title">Session Details (from session logs)</div>
+        <div id="sessionDetailsList" style="max-height: 500px; overflow-y: auto;"></div>
+      </div>
+    </div>
+
+    <!-- Tokens View -->
+    <div id="tokens" class="view">
+      <div class="summary-cards" id="tokenCards"></div>
+      <div class="grid-2">
+        <div class="chart-container">
+          <div class="chart-title">Token Usage by Model</div>
+          <div class="chart-wrapper"><canvas id="tokensByModelChart"></canvas></div>
+        </div>
+        <div class="chart-container">
+          <div class="chart-title">Cache Efficiency</div>
+          <div class="chart-wrapper"><canvas id="cacheChart"></canvas></div>
+        </div>
+      </div>
+      <div class="grid-2">
+        <div class="card">
+          <div class="chart-title">Cost Breakdown by Model</div>
+          <div id="costBreakdown"></div>
+        </div>
+        <div class="card" id="cacheSavingsCard">
+          <div class="chart-title">Cache Savings Analysis</div>
+          <div id="cacheSavingsBreakdown"></div>
+        </div>
+      </div>
+
+      <!-- Cache Education Section -->
+      <div class="card" style="margin-top: 1.5rem;">
+        <div class="chart-title" style="display: flex; align-items: center; justify-content: space-between;">
+          <span>How Prompt Caching Works</span>
+          <button onclick="toggleCacheInfo()" id="cacheInfoToggle" style="background: var(--bg-tertiary); padding: 0.25rem 0.75rem; font-size: 0.75rem;">Show Details</button>
+        </div>
+        <div id="cacheEducation" style="display: none; margin-top: 1rem;">
+          <!-- How it works -->
+          <div style="margin-bottom: 1.5rem;">
+            <h4 style="color: var(--accent); margin-bottom: 0.75rem; font-size: 0.9rem;">What is Prompt Caching?</h4>
+            <p style="color: var(--text-secondary); font-size: 0.85rem; line-height: 1.6;">
+              Claude Code automatically caches your conversation context and system prompts. When you continue a session or start a new one in the same project, Claude can reuse this cached context instead of processing it fresh each time.
+            </p>
+          </div>
+
+          <!-- Visual diagram -->
+          <div style="background: var(--bg-tertiary); border-radius: 8px; padding: 1.25rem; margin-bottom: 1.5rem;">
+            <div style="display: grid; grid-template-columns: 1fr auto 1fr; gap: 1rem; align-items: center; text-align: center;">
+              <div style="background: var(--bg-secondary); padding: 1rem; border-radius: 6px; border: 2px solid var(--warning);">
+                <div style="font-size: 1.5rem; margin-bottom: 0.5rem;">1. Cache Write</div>
+                <div style="color: var(--warning); font-weight: 600;">1.25x base price</div>
+                <div style="color: var(--text-secondary); font-size: 0.75rem; margin-top: 0.5rem;">First time sending context</div>
+              </div>
+              <div style="font-size: 2rem; color: var(--text-secondary);">→</div>
+              <div style="background: var(--bg-secondary); padding: 1rem; border-radius: 6px; border: 2px solid var(--success);">
+                <div style="font-size: 1.5rem; margin-bottom: 0.5rem;">2. Cache Read</div>
+                <div style="color: var(--success); font-weight: 600;">0.1x base price (90% off!)</div>
+                <div style="color: var(--text-secondary); font-size: 0.75rem; margin-top: 0.5rem;">Reusing cached context</div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Pricing table -->
+          <div style="margin-bottom: 1.5rem;">
+            <h4 style="color: var(--accent); margin-bottom: 0.75rem; font-size: 0.9rem;">Pricing Breakdown (per Million Tokens)</h4>
+            <table style="width: 100%; font-size: 0.85rem;">
+              <thead>
+                <tr style="background: var(--bg-tertiary);">
+                  <th style="padding: 0.75rem; text-align: left;">Token Type</th>
+                  <th style="padding: 0.75rem; text-align: right;">Opus 4</th>
+                  <th style="padding: 0.75rem; text-align: right;">Sonnet 4</th>
+                  <th style="padding: 0.75rem; text-align: right;">Multiplier</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr>
+                  <td style="padding: 0.75rem;">Base Input</td>
+                  <td style="padding: 0.75rem; text-align: right;">$15.00</td>
+                  <td style="padding: 0.75rem; text-align: right;">$3.00</td>
+                  <td style="padding: 0.75rem; text-align: right; color: var(--text-secondary);">1.0x</td>
+                </tr>
+                <tr>
+                  <td style="padding: 0.75rem;">Output</td>
+                  <td style="padding: 0.75rem; text-align: right;">$75.00</td>
+                  <td style="padding: 0.75rem; text-align: right;">$15.00</td>
+                  <td style="padding: 0.75rem; text-align: right; color: var(--text-secondary);">—</td>
+                </tr>
+                <tr style="background: rgba(245, 158, 11, 0.1);">
+                  <td style="padding: 0.75rem; color: var(--warning);">Cache Write (5min)</td>
+                  <td style="padding: 0.75rem; text-align: right;">$18.75</td>
+                  <td style="padding: 0.75rem; text-align: right;">$3.75</td>
+                  <td style="padding: 0.75rem; text-align: right; color: var(--warning);">1.25x</td>
+                </tr>
+                <tr style="background: rgba(16, 185, 129, 0.1);">
+                  <td style="padding: 0.75rem; color: var(--success);">Cache Read</td>
+                  <td style="padding: 0.75rem; text-align: right; color: var(--success);">$1.50</td>
+                  <td style="padding: 0.75rem; text-align: right; color: var(--success);">$0.30</td>
+                  <td style="padding: 0.75rem; text-align: right; color: var(--success); font-weight: 600;">0.1x</td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+
+          <!-- Benefits -->
+          <div style="margin-bottom: 1rem;">
+            <h4 style="color: var(--accent); margin-bottom: 0.75rem; font-size: 0.9rem;">Why This Matters</h4>
+            <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 1rem;">
+              <div style="background: var(--bg-tertiary); padding: 1rem; border-radius: 6px;">
+                <div style="color: var(--success); font-weight: 600; margin-bottom: 0.5rem;">90% Cost Reduction</div>
+                <div style="color: var(--text-secondary); font-size: 0.8rem;">Cache reads cost just 10% of normal input tokens</div>
+              </div>
+              <div style="background: var(--bg-tertiary); padding: 1rem; border-radius: 6px;">
+                <div style="color: var(--accent); font-weight: 600; margin-bottom: 0.5rem;">Automatic</div>
+                <div style="color: var(--text-secondary); font-size: 0.8rem;">Claude Code handles caching automatically - no configuration needed</div>
+              </div>
+              <div style="background: var(--bg-tertiary); padding: 1rem; border-radius: 6px;">
+                <div style="color: var(--warning); font-weight: 600; margin-bottom: 0.5rem;">5-Minute TTL</div>
+                <div style="color: var(--text-secondary); font-size: 0.8rem;">Cache expires after 5 minutes of inactivity (1-hour option available)</div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Your savings highlight -->
+          <div id="yourSavingsHighlight" style="background: linear-gradient(135deg, rgba(16, 185, 129, 0.15), rgba(99, 102, 241, 0.15)); border: 1px solid var(--success); border-radius: 8px; padding: 1.25rem; margin-top: 1rem;"></div>
+
+          <p style="color: var(--text-secondary); font-size: 0.75rem; margin-top: 1rem; text-align: center;">
+            Source: <a href="https://platform.claude.com/docs/en/about-claude/pricing" target="_blank" style="color: var(--accent);">Claude API Pricing Documentation</a>
+          </p>
+        </div>
+      </div>
+    </div>
+
+    <!-- Tools View -->
+    <div id="tools" class="view">
+      <div class="summary-cards" id="toolsCards"></div>
+      <div class="grid-2">
+        <div class="chart-container">
+          <div class="chart-title">Tool Calls Over Time</div>
+          <div class="chart-wrapper"><canvas id="toolsChart"></canvas></div>
+        </div>
+        <div class="chart-container">
+          <div class="chart-title">Tool Usage by Type</div>
+          <div class="chart-wrapper"><canvas id="toolTypesChart"></canvas></div>
+        </div>
+      </div>
+      <div class="grid-2">
+        <div class="card">
+          <div class="chart-title">Tool Names & Usage</div>
+          <div id="toolNamesUsage"></div>
+        </div>
+        <div class="card">
+          <div class="chart-title">Tool Usage Insights</div>
+          <div id="toolInsights"></div>
+        </div>
+      </div>
+      <div class="card" style="margin-top: 1.5rem;">
+        <div class="chart-title">Daily Tool Breakdown</div>
+        <div id="toolStats" style="max-height: 300px; overflow-y: auto;"></div>
+      </div>
+
+      <!-- Tool Type Details Section -->
+      <div class="grid-2" style="margin-top: 1.5rem;">
+        <div class="card">
+          <div class="chart-title">📋 Task & Agent Tools</div>
+          <div id="taskToolDetails">
+            <div class="tool-detail-card">
+              <h4>🤖 Task</h4>
+              <p>Launches specialized sub-agents to handle complex, multi-step tasks autonomously. Sub-agents can explore codebases, run tests, plan implementations, or perform research.</p>
+              <div class="tool-examples">Types: <code>Explore</code> <code>Plan</code> <code>Bash</code> <code>general-purpose</code></div>
+            </div>
+            <div class="tool-detail-card">
+              <h4>📤 TaskOutput</h4>
+              <p>Retrieves output from running or completed background tasks. Used to check on agent progress or get results from async operations.</p>
+            </div>
+            <div class="tool-detail-card">
+              <h4>✅ TodoWrite</h4>
+              <p>Creates and manages structured task lists during coding sessions. Tracks progress, organizes complex tasks, and provides visibility into work items.</p>
+            </div>
+            <div class="tool-detail-card">
+              <h4>❓ AskUserQuestion</h4>
+              <p>Prompts the user with questions during execution to gather preferences, clarify instructions, or get decisions on implementation choices.</p>
+            </div>
+          </div>
+        </div>
+        <div class="card">
+          <div class="chart-title">🔧 Other Tools</div>
+          <div id="otherToolDetails">
+            <div class="tool-detail-card">
+              <h4>🌐 WebFetch</h4>
+              <p>Fetches and processes content from URLs. Converts HTML to markdown and analyzes web content to extract relevant information.</p>
+            </div>
+            <div class="tool-detail-card">
+              <h4>🔍 WebSearch</h4>
+              <p>Searches the web to find up-to-date information beyond the knowledge cutoff. Returns search results with links and summaries.</p>
+            </div>
+            <div class="tool-detail-card">
+              <h4>📝 ExitPlanMode / EnterPlanMode</h4>
+              <p>Controls planning workflow. EnterPlanMode starts research and design phase; ExitPlanMode signals readiness for user approval.</p>
+            </div>
+            <div class="tool-detail-card">
+              <h4>🛑 KillShell</h4>
+              <p>Terminates running background bash shells. Used to stop long-running processes or clean up stuck commands.</p>
+            </div>
+            <div class="tool-detail-card">
+              <h4>⚡ Skill</h4>
+              <p>Invokes specialized skills/slash commands like <code>/commit</code>, <code>/review-pr</code> for common workflows.</p>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Bash Execution Details Section -->
+      <div class="card" id="bashDetailsSection" style="margin-top: 1.5rem;">
+        <div class="chart-title">🖥️ Bash Execution Details</div>
+        <p style="color: var(--text-secondary); font-size: 0.85rem; margin-bottom: 1rem;">
+          Detailed analysis of Bash commands executed by Claude Code (from session logs)
+        </p>
+        <div id="bashDetailsContent">
+          <div style="text-align: center; padding: 2rem; color: var(--text-secondary);">
+            <div style="font-size: 2rem; margin-bottom: 0.5rem;">📂</div>
+            <p>Load <code>~/.claude</code> directory to see detailed Bash execution data.</p>
+          </div>
+        </div>
+      </div>
+
+      <!-- Bash Command Categories Chart -->
+      <div id="bashChartsSection" class="grid-2" style="margin-top: 1.5rem; display: none;">
+        <div class="chart-container">
+          <div class="chart-title">Command Categories</div>
+          <div class="chart-wrapper"><canvas id="bashCategoriesChart"></canvas></div>
+        </div>
+        <div class="chart-container">
+          <div class="chart-title">Git Operations Breakdown</div>
+          <div class="chart-wrapper"><canvas id="gitOpsChart"></canvas></div>
+        </div>
+      </div>
+
+      <!-- Bash Commands List -->
+      <div id="bashCommandsList" class="card" style="margin-top: 1.5rem; display: none;">
+        <div class="chart-title">Recent Bash Commands</div>
+        <div id="bashCommandsTable" style="max-height: 400px; overflow-y: auto;"></div>
+      </div>
+    </div>
+
+    <!-- Projects View -->
+    <div id="projects" class="view">
+      <div class="summary-cards" id="projectsCards"></div>
+      <div class="grid-2">
+        <div class="chart-container">
+          <div class="chart-title">Activity by Project</div>
+          <div class="chart-wrapper"><canvas id="projectsChart"></canvas></div>
+        </div>
+        <div class="card">
+          <div class="chart-title">Project Breakdown</div>
+          <div id="projectList"></div>
+        </div>
+      </div>
+      <div class="card" id="projectsEmptyState" style="display: none; text-align: center; padding: 2rem;">
+        <div style="color: var(--warning); font-size: 2rem; margin-bottom: 1rem;">📁</div>
+        <div class="chart-title">No Project Data Available</div>
+        <p style="color: var(--text-secondary); margin: 1rem 0; line-height: 1.6;">
+          Project data requires loading the full <code>~/.claude</code> directory including the <code>history.jsonl</code> file.
+        </p>
+        <p style="color: var(--text-secondary); font-size: 0.875rem; line-height: 1.6;">
+          <strong>How to load project data:</strong><br>
+          1. Click "Load .claude Directory" button<br>
+          2. Select your <code>~/.claude</code> folder<br>
+          3. Ensure <code>history.jsonl</code> is included in the selection
+        </p>
+      </div>
+    </div>
+
+    <!-- Network View -->
+    <div id="network" class="view">
+      <div class="summary-cards" id="networkCards"></div>
+      <div class="grid-2">
+        <div class="chart-container">
+          <div class="chart-title">Daily API Requests (Messages)</div>
+          <div class="chart-wrapper"><canvas id="dailyApiChart"></canvas></div>
+        </div>
+        <div class="chart-container">
+          <div class="chart-title">API Calls by Type</div>
+          <div class="chart-wrapper"><canvas id="apiTypeChart"></canvas></div>
+        </div>
+      </div>
+      <div class="grid-2">
+        <div class="card">
+          <div class="chart-title">API Request Statistics</div>
+          <div id="apiStats"></div>
+        </div>
+        <div class="card">
+          <div class="chart-title">Data Transfer Estimates</div>
+          <div id="networkMetrics"></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Custom Metrics View -->
+    <div id="custom" class="view">
+      <div class="grid-2">
+        <div class="card">
+          <div class="chart-title">Custom Metric Builder</div>
+          <div class="custom-metric-form">
+            <div class="form-group">
+              <label>Metric Name</label>
+              <input type="text" id="metricName" placeholder="e.g., Productivity Score">
+            </div>
+            <div class="form-group">
+              <label>Formula</label>
+              <input type="text" id="metricFormula" placeholder="e.g., totalMessages / activeHours">
+            </div>
+            <button onclick="addCustomMetric()">Add Metric</button>
+          </div>
+        </div>
+        <div class="card">
+          <div class="chart-title">Available Variables</div>
+          <div style="font-size: 0.875rem; line-height: 1.8;">
+            <div class="metric-row"><code style="color: var(--accent);">totalMessages</code> <span style="color: var(--text-secondary);">- Total message count</span></div>
+            <div class="metric-row"><code style="color: var(--accent);">totalSessions</code> <span style="color: var(--text-secondary);">- Total session count</span></div>
+            <div class="metric-row"><code style="color: var(--accent);">totalToolCalls</code> <span style="color: var(--text-secondary);">- Total tool invocations</span></div>
+            <div class="metric-row"><code style="color: var(--accent);">activeDays</code> <span style="color: var(--text-secondary);">- Days with activity</span></div>
+            <div class="metric-row"><code style="color: var(--accent);">inputTokens</code> <span style="color: var(--text-secondary);">- Total input tokens</span></div>
+            <div class="metric-row"><code style="color: var(--accent);">outputTokens</code> <span style="color: var(--text-secondary);">- Total output tokens</span></div>
+            <div class="metric-row"><code style="color: var(--accent);">cacheReadTokens</code> <span style="color: var(--text-secondary);">- Cache read tokens</span></div>
+            <div class="metric-row"><code style="color: var(--accent);">totalCost</code> <span style="color: var(--text-secondary);">- Estimated total cost ($)</span></div>
+          </div>
+        </div>
+      </div>
+
+      <div class="card" style="margin-top: 1.5rem;">
+        <div class="chart-title">Example Metrics to Try</div>
+        <div class="grid-2" style="gap: 1rem; margin-top: 1rem;">
+          <div style="background: var(--bg-tertiary); padding: 1rem; border-radius: 8px; cursor: pointer;" onclick="loadExampleMetric('Productivity Score', 'totalMessages / activeDays')">
+            <div style="color: var(--success); font-weight: 600; margin-bottom: 0.5rem;">Productivity Score</div>
+            <code style="font-size: 0.75rem; color: var(--text-secondary);">totalMessages / activeDays</code>
+            <p style="font-size: 0.75rem; color: var(--text-secondary); margin-top: 0.5rem;">Messages per active day - measures daily output</p>
+          </div>
+          <div style="background: var(--bg-tertiary); padding: 1rem; border-radius: 8px; cursor: pointer;" onclick="loadExampleMetric('Tool Efficiency', '(totalToolCalls / totalMessages) * 100')">
+            <div style="color: var(--warning); font-weight: 600; margin-bottom: 0.5rem;">Tool Efficiency %</div>
+            <code style="font-size: 0.75rem; color: var(--text-secondary);">(totalToolCalls / totalMessages) * 100</code>
+            <p style="font-size: 0.75rem; color: var(--text-secondary); margin-top: 0.5rem;">Percentage of messages that involve tool calls</p>
+          </div>
+          <div style="background: var(--bg-tertiary); padding: 1rem; border-radius: 8px; cursor: pointer;" onclick="loadExampleMetric('Cost per Session', 'totalCost / totalSessions')">
+            <div style="color: var(--accent); font-weight: 600; margin-bottom: 0.5rem;">Cost per Session</div>
+            <code style="font-size: 0.75rem; color: var(--text-secondary);">totalCost / totalSessions</code>
+            <p style="font-size: 0.75rem; color: var(--text-secondary); margin-top: 0.5rem;">Average cost for each session</p>
+          </div>
+          <div style="background: var(--bg-tertiary); padding: 1rem; border-radius: 8px; cursor: pointer;" onclick="loadExampleMetric('Cache Efficiency', '(cacheReadTokens / (cacheReadTokens + inputTokens)) * 100')">
+            <div style="color: var(--success); font-weight: 600; margin-bottom: 0.5rem;">Cache Efficiency %</div>
+            <code style="font-size: 0.75rem; color: var(--text-secondary);">(cacheReadTokens / (cacheReadTokens + inputTokens)) * 100</code>
+            <p style="font-size: 0.75rem; color: var(--text-secondary); margin-top: 0.5rem;">Percentage of input served from cache</p>
+          </div>
+        </div>
+        <p style="font-size: 0.75rem; color: var(--text-secondary); margin-top: 1rem; text-align: center;">Click any example to load it into the builder</p>
+      </div>
+
+      <div class="card" style="margin-top: 1.5rem;">
+        <div class="chart-title">Your Custom Metrics</div>
+        <div id="customMetricsList"></div>
+      </div>
+      <div class="export-buttons" style="margin-top: 1.5rem;">
+        <button onclick="exportCSV()">Export CSV</button>
+        <button onclick="exportJSON()">Export JSON</button>
+      </div>
+    </div>
+
+    <!-- Prompts View -->
+    <div id="prompts" class="view">
+      <div class="summary-cards" id="promptsCards"></div>
+
+      <!-- Agent Loop Charts -->
+      <div class="grid-2" style="margin-top: 1.5rem;">
+        <div class="chart-container" style="height: 280px;">
+          <div class="chart-title">Model Distribution</div>
+          <canvas id="modelDistChart"></canvas>
+        </div>
+        <div class="chart-container" style="height: 280px;">
+          <div class="chart-title">Turn Type Distribution</div>
+          <canvas id="turnTypeChart"></canvas>
+        </div>
+      </div>
+
+      <div class="card" style="margin-top: 1.5rem;">
+        <div class="chart-title" style="display: flex; justify-content: space-between; align-items: center;">
+          <span>Conversation History</span>
+          <div style="display: flex; gap: 0.5rem; align-items: center;">
+            <input type="text" id="promptSearch" placeholder="Search prompts..."
+              style="padding: 0.4rem 0.8rem; border: 1px solid var(--border); border-radius: 4px; background: var(--bg-secondary); color: var(--text-primary); font-size: 0.875rem; width: 200px;">
+            <select id="promptSourceFilter" style="padding: 0.4rem; border: 1px solid var(--border); border-radius: 4px; background: var(--bg-secondary); color: var(--text-primary); font-size: 0.875rem;">
+              <option value="">All Sources</option>
+              <option value="user">User Only</option>
+              <option value="system">System Only</option>
+            </select>
+            <select id="promptProjectFilter" style="padding: 0.4rem; border: 1px solid var(--border); border-radius: 4px; background: var(--bg-secondary); color: var(--text-primary); font-size: 0.875rem;">
+              <option value="">All Projects</option>
+            </select>
+          </div>
+        </div>
+        <div id="promptsList" style="max-height: 600px; overflow-y: auto; margin-top: 1rem;"></div>
+      </div>
+
+      <div id="promptDetailModal" style="display: none; position: fixed; top: 0; left: 0; right: 0; bottom: 0; background: rgba(0,0,0,0.8); z-index: 1000; padding: 2rem; overflow-y: auto;">
+        <div style="max-width: 900px; margin: 0 auto; background: var(--bg-primary); border-radius: 8px; padding: 1.5rem; position: relative;">
+          <button onclick="closePromptDetail()" style="position: absolute; top: 1rem; right: 1rem; background: none; border: none; color: var(--text-secondary); font-size: 1.5rem; cursor: pointer;">&times;</button>
+          <div id="promptDetailContent"></div>
+        </div>
+      </div>
+    </div>
+  </main>
+
+  <script>
+    // Global state
+    let data = null;
+    let originalData = null;  // Store unfiltered data for date filtering
+    let charts = {};
+    let customMetrics = JSON.parse(localStorage.getItem('customMetrics') || '[]');
+
+    // Tab switching
+    document.querySelectorAll('.tab').forEach(tab => {
+      tab.addEventListener('click', () => {
+        document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+        document.querySelectorAll('.view').forEach(v => v.classList.remove('active'));
+        tab.classList.add('active');
+        document.getElementById(tab.dataset.view).classList.add('active');
+      });
+    });
+
+    // File loading
+    document.getElementById('folderInput').addEventListener('change', async (e) => {
+      const files = Array.from(e.target.files);
+      await loadData(files);
+    });
+
+    async function loadData(files) {
+      document.getElementById('dataStatus').textContent = 'Loading...';
+
+      try {
+        // Find stats-cache.json
+        const statsFile = files.find(f => f.name === 'stats-cache.json');
+        const historyFile = files.find(f => f.name === 'history.jsonl');
+
+        if (!statsFile) {
+          throw new Error('stats-cache.json not found. Make sure you selected the .claude directory.');
+        }
+
+        // Parse stats cache
+        const statsText = await statsFile.text();
+        const stats = JSON.parse(statsText);
+
+        // Parse history for project data
+        let history = [];
+        if (historyFile) {
+          const historyText = await historyFile.text();
+          history = historyText.trim().split('\n').map(line => {
+            try { return JSON.parse(line); }
+            catch { return null; }
+          }).filter(Boolean);
+        }
+
+        // Parse session logs to get REAL comprehensive metrics
+        document.getElementById('dataStatus').textContent = 'Parsing session logs for comprehensive metrics...';
+        const sessionData = await parseSessionLogs(files);
+        stats.toolUsage = sessionData.toolUsage;
+        stats.dateMetrics = sessionData.dateMetrics;
+        stats.sessionDetails = sessionData.sessionDetails;
+        stats.totalApiCalls = sessionData.totalApiCalls;
+        stats.bashCommands = sessionData.bashCommands;
+        stats.prompts = sessionData.prompts;
+
+        // Link sessions with projects from history
+        for (const h of history) {
+          if (h.sessionId && stats.sessionDetails[h.sessionId]) {
+            const projectName = h.project ? h.project.split('/').pop() : null;
+            stats.sessionDetails[h.sessionId].project = projectName;
+          }
+        }
+
+        // Link prompts with projects from history (by sessionId)
+        const sessionToProject = {};
+        for (const h of history) {
+          if (h.sessionId && h.project) {
+            sessionToProject[h.sessionId] = h.project.split('/').pop();
+          }
+        }
+        for (const prompt of stats.prompts) {
+          if (prompt.sessionId && sessionToProject[prompt.sessionId]) {
+            prompt.project = sessionToProject[prompt.sessionId];
+          }
+        }
+
+        // Store original data for filtering
+        originalData = { stats: JSON.parse(JSON.stringify(stats)), history: [...history] };
+        data = { stats, history };
+
+        // Set up date pickers with data range
+        setupDateFilters(stats);
+
+        renderDashboard();
+
+        document.getElementById('dataStatus').textContent = `Loaded: ${stats.totalSessions} sessions, ${stats.totalMessages.toLocaleString()} messages`;
+        document.getElementById('overviewEmpty').style.display = 'none';
+        document.getElementById('overviewContent').style.display = 'block';
+        document.getElementById('dateFilterBar').style.display = 'flex';
+      } catch (err) {
+        console.error(err);
+        document.getElementById('dataStatus').textContent = 'Error: ' + err.message;
+      }
+    }
+
+    // Parse all session log files to extract comprehensive metrics
+    async function parseSessionLogs(files) {
+      const toolCounts = {};
+      const dateMetrics = {};  // { date: { apiCalls, models: {}, tools: {} } }
+      const sessionDetails = {};  // { sessionId: { startTime, endTime, messages, apiCalls, tokens, tools, models, project } }
+      const bashCommands = [];  // Array of bash command objects
+      const prompts = [];  // Array of user prompts with responses
+      let totalApiCalls = 0;
+
+      // Find all .jsonl files in projects/ subdirectories
+      const sessionLogFiles = files.filter(f =>
+        f.webkitRelativePath.includes('/projects/') &&
+        f.name.endsWith('.jsonl')
+      );
+
+      for (const file of sessionLogFiles) {
+        try {
+          const text = await file.text();
+          const lines = text.split('\n');
+
+          for (const line of lines) {
+            if (!line.trim()) continue;
+
+            try {
+              const obj = JSON.parse(line);
+              const sessionId = obj.sessionId;
+              const timestamp = obj.timestamp;
+
+              // Initialize session details
+              if (sessionId && !sessionDetails[sessionId]) {
+                sessionDetails[sessionId] = {
+                  sessionId,
+                  startTime: timestamp,
+                  endTime: timestamp,
+                  messageCount: 0,
+                  apiCalls: 0,
+                  inputTokens: 0,
+                  outputTokens: 0,
+                  cacheReadTokens: 0,
+                  cacheCreateTokens: 0,
+                  toolCalls: 0,
+                  models: new Set(),
+                  project: null
+                };
+              }
+
+              // Update session timestamps
+              if (sessionId && timestamp) {
+                if (timestamp < sessionDetails[sessionId].startTime) {
+                  sessionDetails[sessionId].startTime = timestamp;
+                }
+                if (timestamp > sessionDetails[sessionId].endTime) {
+                  sessionDetails[sessionId].endTime = timestamp;
+                }
+              }
+
+              // Count messages
+              if (sessionId && (obj.type === 'user' || obj.type === 'assistant')) {
+                sessionDetails[sessionId].messageCount++;
+              }
+
+              // Extract user prompts for Prompts tab
+              if (obj.type === 'user' && obj.message) {
+                let promptText = '';
+                let isToolResult = false;
+
+                if (typeof obj.message.content === 'string') {
+                  promptText = obj.message.content;
+                } else if (Array.isArray(obj.message.content)) {
+                  // Check if this is a tool result
+                  isToolResult = obj.message.content.some(c => c.type === 'tool_result');
+                  promptText = obj.message.content
+                    .filter(c => c.type === 'text')
+                    .map(c => c.text)
+                    .join('\n');
+                }
+
+                if (promptText.trim()) {
+                  prompts.push({
+                    type: 'user',
+                    sessionId: sessionId || '',
+                    timestamp: timestamp || '',
+                    content: promptText.trim(),
+                    project: file.webkitRelativePath.split('/')[1] || '',
+                    uuid: obj.uuid || '',
+                    isMeta: obj.isMeta || false,
+                    isToolResult: isToolResult,
+                    // Determine source: user-typed, system, or tool-result
+                    source: isToolResult ? 'tool_result' : (obj.isMeta ? 'system' : 'user')
+                  });
+                }
+              }
+
+              // Extract assistant responses for Prompts tab
+              if (obj.type === 'assistant' && obj.message?.content) {
+                let responseText = '';
+                let toolCallCount = 0;
+                let hasThinking = false;
+                const toolDetails = [];  // Store tool call details
+
+                for (const content of obj.message.content) {
+                  if (content.type === 'text') {
+                    responseText += (responseText ? '\n' : '') + content.text;
+                  } else if (content.type === 'tool_use') {
+                    toolCallCount++;
+                    toolDetails.push({
+                      name: content.name || 'unknown',
+                      id: content.id || '',
+                      input: content.input || {}
+                    });
+                  } else if (content.type === 'thinking') {
+                    hasThinking = true;
+                  }
+                }
+
+                prompts.push({
+                  type: 'assistant',
+                  sessionId: sessionId || '',
+                  timestamp: timestamp || '',
+                  content: responseText.trim(),
+                  toolCalls: toolCallCount,
+                  toolDetails: toolDetails,
+                  hasThinking: hasThinking,
+                  model: obj.message.model || '',
+                  tokens: obj.message.usage || null,
+                  uuid: obj.uuid || '',
+                  parentUuid: obj.parentUuid || '',
+                  isSidechain: obj.isSidechain || false,
+                  stopReason: obj.message.stop_reason || ''
+                });
+              }
+
+              // Process assistant entries with usage data (API calls)
+              if (obj.type === 'assistant' && obj.message?.usage) {
+                totalApiCalls++;
+                const usage = obj.message.usage;
+                const model = obj.message.model || 'unknown';
+                const date = timestamp ? timestamp.slice(0, 10) : null;
+
+                // Update session details
+                if (sessionId) {
+                  sessionDetails[sessionId].apiCalls++;
+                  sessionDetails[sessionId].inputTokens += usage.input_tokens || 0;
+                  sessionDetails[sessionId].outputTokens += usage.output_tokens || 0;
+                  sessionDetails[sessionId].cacheReadTokens += usage.cache_read_input_tokens || 0;
+                  sessionDetails[sessionId].cacheCreateTokens += usage.cache_creation_input_tokens || 0;
+                  sessionDetails[sessionId].models.add(model);
+                }
+
+                // Update date metrics
+                if (date) {
+                  if (!dateMetrics[date]) {
+                    dateMetrics[date] = { apiCalls: 0, models: {}, tools: {} };
+                  }
+                  dateMetrics[date].apiCalls++;
+
+                  if (!dateMetrics[date].models[model]) {
+                    dateMetrics[date].models[model] = {
+                      inputTokens: 0,
+                      outputTokens: 0,
+                      cacheReadInputTokens: 0,
+                      cacheCreationInputTokens: 0
+                    };
+                  }
+                  dateMetrics[date].models[model].inputTokens += usage.input_tokens || 0;
+                  dateMetrics[date].models[model].outputTokens += usage.output_tokens || 0;
+                  dateMetrics[date].models[model].cacheReadInputTokens += usage.cache_read_input_tokens || 0;
+                  dateMetrics[date].models[model].cacheCreationInputTokens += usage.cache_creation_input_tokens || 0;
+                }
+
+                // Process tool calls in content
+                if (obj.message?.content) {
+                  for (const content of obj.message.content) {
+                    if (content.type === 'tool_use' && content.name) {
+                      let toolName = content.name;
+                      if (toolName.startsWith('mcp__')) {
+                        const parts = toolName.split('__');
+                        if (parts.length >= 2) {
+                          toolName = `MCP: ${parts[1]}`;
+                        }
+                      }
+                      toolCounts[toolName] = (toolCounts[toolName] || 0) + 1;
+
+                      if (sessionId) {
+                        sessionDetails[sessionId].toolCalls++;
+                      }
+
+                      if (date) {
+                        dateMetrics[date].tools[toolName] = (dateMetrics[date].tools[toolName] || 0) + 1;
+                      }
+
+                      // Extract Bash commands
+                      if (content.name === 'Bash' && content.input) {
+                        bashCommands.push({
+                          command: content.input.command || '',
+                          description: content.input.description || '',
+                          timestamp: timestamp || '',
+                          sessionId: sessionId || ''
+                        });
+                      }
+                    }
+                  }
+                }
+              }
+            } catch (e) {
+              // Skip malformed lines
+            }
+          }
+        } catch (e) {
+          console.warn('Error parsing session log:', file.name, e);
+        }
+      }
+
+      // Convert Sets to Arrays for JSON serialization
+      for (const session of Object.values(sessionDetails)) {
+        session.models = Array.from(session.models);
+        // Calculate duration
+        if (session.startTime && session.endTime) {
+          const start = new Date(session.startTime).getTime();
+          const end = new Date(session.endTime).getTime();
+          session.durationMs = end - start;
+        }
+      }
+
+      return { toolUsage: toolCounts, dateMetrics, sessionDetails, totalApiCalls, bashCommands, prompts };
+    }
+
+    function renderDashboard() {
+      if (!data) return;
+      const { stats, history } = data;
+
+      // Calculate derived metrics
+      const totalInputTokens = Object.values(stats.modelUsage).reduce((sum, m) => sum + (m.inputTokens || 0), 0);
+      const totalOutputTokens = Object.values(stats.modelUsage).reduce((sum, m) => sum + (m.outputTokens || 0), 0);
+      const totalCacheRead = Object.values(stats.modelUsage).reduce((sum, m) => sum + (m.cacheReadInputTokens || 0), 0);
+      const totalCacheCreate = Object.values(stats.modelUsage).reduce((sum, m) => sum + (m.cacheCreationInputTokens || 0), 0);
+      const totalToolCalls = stats.dailyActivity.reduce((sum, d) => sum + (d.toolCallCount || 0), 0);
+      const activeHours = Object.keys(stats.hourCounts || {}).length;
+
+      // Estimate cost
+      const estimatedCost = calculateCost(stats.modelUsage);
+
+      // Estimate bytes
+      const bytesSent = (totalInputTokens + totalCacheCreate) * 4;
+      const bytesReceived = totalOutputTokens * 4;
+
+      // Overview summary cards
+      const totalApiCalls = stats.totalApiCalls || 0;
+      document.getElementById('summaryCards').innerHTML = `
+        <div class="card">
+          <div class="card-title">Total Sessions</div>
+          <div class="card-value">${stats.totalSessions.toLocaleString()}</div>
+          <div class="card-subtitle">Since ${new Date(stats.firstSessionDate).toLocaleDateString()}</div>
+        </div>
+        <div class="card">
+          <div class="card-title">Total Messages</div>
+          <div class="card-value">${stats.totalMessages.toLocaleString()}</div>
+          <div class="card-subtitle">${(stats.totalMessages / stats.totalSessions).toFixed(1)} avg per session</div>
+        </div>
+        <div class="card">
+          <div class="card-title">API Calls</div>
+          <div class="card-value">${totalApiCalls.toLocaleString()}</div>
+          <div class="card-subtitle">${(totalApiCalls / stats.totalSessions).toFixed(1)} avg per session</div>
+        </div>
+        <div class="card">
+          <div class="card-title">Total Tool Calls</div>
+          <div class="card-value">${totalToolCalls.toLocaleString()}</div>
+          <div class="card-subtitle">${(totalToolCalls / stats.totalSessions).toFixed(1)} avg per session</div>
+        </div>
+        <div class="card">
+          <div class="card-title">Cost (from tokens)</div>
+          <div class="card-value">$${estimatedCost.toFixed(2)}</div>
+          <div class="card-subtitle">Calculated from token usage</div>
+        </div>
+      `;
+
+      // Daily activity chart
+      renderChart('dailyActivityChart', {
+        type: 'bar',
+        data: {
+          labels: stats.dailyActivity.map(d => d.date),
+          datasets: [
+            {
+              label: 'Messages',
+              data: stats.dailyActivity.map(d => d.messageCount),
+              backgroundColor: 'rgba(99, 102, 241, 0.8)',
+            },
+            {
+              label: 'Tool Calls',
+              data: stats.dailyActivity.map(d => d.toolCallCount),
+              backgroundColor: 'rgba(16, 185, 129, 0.8)',
+            }
+          ]
+        },
+        options: getChartOptions('Daily Activity')
+      });
+
+      // Hourly distribution chart
+      const hourLabels = Array.from({length: 24}, (_, i) => `${i}:00`);
+      const hourData = hourLabels.map((_, i) => stats.hourCounts?.[i] || 0);
+
+      renderChart('hourlyChart', {
+        type: 'bar',
+        data: {
+          labels: hourLabels,
+          datasets: [{
+            label: 'Sessions',
+            data: hourData,
+            backgroundColor: 'rgba(99, 102, 241, 0.8)',
+          }]
+        },
+        options: getChartOptions('Sessions by Hour')
+      });
+
+      // Sessions view
+      const sessionDetailsList = stats.sessionDetails ? Object.values(stats.sessionDetails) : [];
+      const avgDuration = sessionDetailsList.length > 0
+        ? sessionDetailsList.reduce((sum, s) => sum + (s.durationMs || 0), 0) / sessionDetailsList.length
+        : 0;
+
+      // Session summary cards
+      document.getElementById('sessionCards').innerHTML = `
+        <div class="card">
+          <div class="card-title">Total Sessions</div>
+          <div class="card-value">${stats.totalSessions.toLocaleString()}</div>
+          <div class="card-subtitle">From session logs</div>
+        </div>
+        <div class="card">
+          <div class="card-title">Avg Duration</div>
+          <div class="card-value">${formatDuration(avgDuration)}</div>
+          <div class="card-subtitle">Per session</div>
+        </div>
+        <div class="card">
+          <div class="card-title">Avg Messages</div>
+          <div class="card-value">${(stats.totalMessages / stats.totalSessions).toFixed(1)}</div>
+          <div class="card-subtitle">Per session</div>
+        </div>
+        <div class="card">
+          <div class="card-title">Avg API Calls</div>
+          <div class="card-value">${(totalApiCalls / stats.totalSessions).toFixed(1)}</div>
+          <div class="card-subtitle">Per session</div>
+        </div>
+      `;
+
+      document.getElementById('sessionStats').innerHTML = `
+        <div class="metric-row">
+          <span class="metric-label">Total Sessions</span>
+          <span class="metric-value">${stats.totalSessions}</span>
+        </div>
+        <div class="metric-row">
+          <span class="metric-label">Average Messages per Session</span>
+          <span class="metric-value">${(stats.totalMessages / stats.totalSessions).toFixed(1)}</span>
+        </div>
+        <div class="metric-row">
+          <span class="metric-label">Average API Calls per Session</span>
+          <span class="metric-value">${(totalApiCalls / stats.totalSessions).toFixed(1)}</span>
+        </div>
+        <div class="metric-row">
+          <span class="metric-label">Longest Session</span>
+          <span class="metric-value">${stats.longestSession?.messageCount || 0} messages</span>
+        </div>
+        <div class="metric-row">
+          <span class="metric-label">First Session</span>
+          <span class="metric-value">${new Date(stats.firstSessionDate).toLocaleDateString()}</span>
+        </div>
+      `;
+
+      // Session details list
+      const sortedSessions = sessionDetailsList
+        .filter(s => s.startTime)
+        .sort((a, b) => new Date(b.startTime) - new Date(a.startTime))
+        .slice(0, 50);  // Show latest 50
+
+      document.getElementById('sessionDetailsList').innerHTML = sortedSessions.length > 0 ? `
+        <table style="width: 100%; border-collapse: collapse; font-size: 0.8rem;">
+          <thead>
+            <tr style="border-bottom: 1px solid var(--border); text-align: left;">
+              <th style="padding: 0.5rem;">Date</th>
+              <th style="padding: 0.5rem;">Duration</th>
+              <th style="padding: 0.5rem;">Messages</th>
+              <th style="padding: 0.5rem;">API Calls</th>
+              <th style="padding: 0.5rem;">In/Out Tokens</th>
+              <th style="padding: 0.5rem;">Cache R/W</th>
+              <th style="padding: 0.5rem;">Tools</th>
+              <th style="padding: 0.5rem;">Model(s)</th>
+              <th style="padding: 0.5rem;">Project</th>
+            </tr>
+          </thead>
+          <tbody>
+            ${sortedSessions.map(s => `
+              <tr style="border-bottom: 1px solid var(--border);">
+                <td style="padding: 0.5rem; color: var(--text-secondary);">${new Date(s.startTime).toLocaleDateString()}</td>
+                <td style="padding: 0.5rem;">${formatDuration(s.durationMs || 0)}</td>
+                <td style="padding: 0.5rem;">${s.messageCount}</td>
+                <td style="padding: 0.5rem;">${s.apiCalls}</td>
+                <td style="padding: 0.5rem;">${formatTokensCompact(s.inputTokens)}/${formatTokensCompact(s.outputTokens)}</td>
+                <td style="padding: 0.5rem;">${formatTokensCompact(s.cacheReadTokens)}/${formatTokensCompact(s.cacheCreateTokens)}</td>
+                <td style="padding: 0.5rem;">${s.toolCalls}</td>
+                <td style="padding: 0.5rem; font-size: 0.7rem;">${s.models.map(m => m.split('-').slice(1,3).join(' ')).join(', ') || '-'}</td>
+                <td style="padding: 0.5rem; color: var(--text-secondary); font-size: 0.7rem;">${s.project || '-'}</td>
+              </tr>
+            `).join('')}
+          </tbody>
+        </table>
+        <p style="color: var(--text-secondary); font-size: 0.7rem; margin-top: 1rem; text-align: center;">
+          Showing ${sortedSessions.length} of ${sessionDetailsList.length} sessions (sorted by date, most recent first)
+        </p>
+      ` : `<p style="color: var(--text-secondary); text-align: center;">No session details available. Load ~/.claude directory with projects/ folder.</p>`;
+
+      renderChart('sessionsChart', {
+        type: 'bar',
+        data: {
+          labels: stats.dailyActivity.map(d => d.date),
+          datasets: [{
+            label: 'Sessions',
+            data: stats.dailyActivity.map(d => d.sessionCount),
+            backgroundColor: 'rgba(99, 102, 241, 0.8)',
+          }]
+        },
+        options: getChartOptions('Sessions per Day')
+      });
+
+      // Tokens view
+      document.getElementById('tokenCards').innerHTML = `
+        <div class="card">
+          <div class="card-title">Input Tokens</div>
+          <div class="card-value">${formatTokens(totalInputTokens)}</div>
+        </div>
+        <div class="card">
+          <div class="card-title">Output Tokens</div>
+          <div class="card-value">${formatTokens(totalOutputTokens)}</div>
+        </div>
+        <div class="card">
+          <div class="card-title">Cache Read</div>
+          <div class="card-value">${formatTokens(totalCacheRead)}</div>
+        </div>
+        <div class="card">
+          <div class="card-title">Cache Created</div>
+          <div class="card-value">${formatTokens(totalCacheCreate)}</div>
+        </div>
+      `;
+
+      const models = Object.keys(stats.modelUsage);
+      renderChart('tokensByModelChart', {
+        type: 'bar',
+        data: {
+          labels: models.map(m => m.split('-').slice(1, 3).join(' ')),
+          datasets: [
+            {
+              label: 'Input',
+              data: models.map(m => stats.modelUsage[m].inputTokens || 0),
+              backgroundColor: 'rgba(99, 102, 241, 0.8)',
+            },
+            {
+              label: 'Output',
+              data: models.map(m => stats.modelUsage[m].outputTokens || 0),
+              backgroundColor: 'rgba(16, 185, 129, 0.8)',
+            }
+          ]
+        },
+        options: getChartOptions('Tokens by Model')
+      });
+
+      renderChart('cacheChart', {
+        type: 'doughnut',
+        data: {
+          labels: ['Cache Read', 'Cache Created', 'Direct Input'],
+          datasets: [{
+            data: [totalCacheRead, totalCacheCreate, totalInputTokens],
+            backgroundColor: ['rgba(16, 185, 129, 0.8)', 'rgba(245, 158, 11, 0.8)', 'rgba(99, 102, 241, 0.8)'],
+          }]
+        },
+        options: {
+          responsive: true,
+          maintainAspectRatio: false,
+          plugins: { legend: { position: 'bottom', labels: { color: '#f1f5f9' } } }
+        }
+      });
+
+      document.getElementById('costBreakdown').innerHTML = models.map(model => {
+        const usage = stats.modelUsage[model];
+        const cost = calculateModelCost(model, usage);
+        return `
+          <div class="metric-row">
+            <span class="metric-label">${model.split('-').slice(1, 3).join(' ')}</span>
+            <span class="metric-value">$${cost.toFixed(4)}</span>
+          </div>
+        `;
+      }).join('');
+
+      // Cache Savings Analysis
+      const cacheSavings = calculateCacheSavings(stats.modelUsage);
+      const savingsPercent = cacheSavings.costWithoutCache > 0
+        ? ((cacheSavings.savings / cacheSavings.costWithoutCache) * 100).toFixed(1)
+        : 0;
+
+      document.getElementById('cacheSavingsBreakdown').innerHTML = `
+        <div class="metric-row">
+          <span class="metric-label">Cost WITHOUT Caching</span>
+          <span class="metric-value" style="color: var(--error);">$${cacheSavings.costWithoutCache.toFixed(2)}</span>
+        </div>
+        <div class="metric-row">
+          <span class="metric-label">Cost WITH Caching</span>
+          <span class="metric-value" style="color: var(--text-primary);">$${cacheSavings.costWithCache.toFixed(2)}</span>
+        </div>
+        <div class="metric-row" style="background: rgba(16, 185, 129, 0.1); margin: 0.5rem -1.5rem; padding: 0.75rem 1.5rem;">
+          <span class="metric-label" style="color: var(--success); font-weight: 600;">Total Savings</span>
+          <span class="metric-value" style="color: var(--success);">$${cacheSavings.savings.toFixed(2)} (${savingsPercent}%)</span>
+        </div>
+        <div style="margin-top: 1rem; padding-top: 1rem; border-top: 1px solid var(--border);">
+          <div class="metric-row">
+            <span class="metric-label">Cache Read Tokens</span>
+            <span class="metric-value">${formatTokens(cacheSavings.totalCacheRead)}</span>
+          </div>
+          <div class="metric-row">
+            <span class="metric-label">Cache Hit Rate</span>
+            <span class="metric-value">${cacheSavings.cacheHitRate.toFixed(2)}%</span>
+          </div>
+          <div class="metric-row">
+            <span class="metric-label">Cache Read Price</span>
+            <span class="metric-value">$1.50/MTok (vs $15 base)</span>
+          </div>
+        </div>
+        <p style="color: var(--text-secondary); font-size: 0.75rem; margin-top: 1rem;">
+          Cache reads cost 10% of base input price. Your ${formatTokens(cacheSavings.totalCacheRead)} cache read tokens
+          saved you ~$${cacheSavings.savings.toFixed(2)} compared to full input pricing.
+        </p>
+      `;
+
+      // Tools view - Enhanced
+      const toolCallsPerDay = stats.dailyActivity.map(d => d.toolCallCount || 0);
+      const peakToolDay = stats.dailyActivity.reduce((max, d) =>
+        (d.toolCallCount || 0) > (max.toolCallCount || 0) ? d : max, stats.dailyActivity[0]);
+      const avgToolsPerMessage = totalToolCalls / stats.totalMessages;
+      const toolCallsRatio = stats.dailyActivity.map(d =>
+        d.messageCount > 0 ? ((d.toolCallCount || 0) / d.messageCount * 100).toFixed(1) : 0);
+
+      // Tool summary cards
+      document.getElementById('toolsCards').innerHTML = `
+        <div class="card">
+          <div class="card-title">Total Tool Calls</div>
+          <div class="card-value">${totalToolCalls.toLocaleString()}</div>
+          <div class="card-subtitle">Across all sessions</div>
+        </div>
+        <div class="card">
+          <div class="card-title">Tools per Session</div>
+          <div class="card-value">${(totalToolCalls / stats.totalSessions).toFixed(1)}</div>
+          <div class="card-subtitle">Average tool calls</div>
+        </div>
+        <div class="card">
+          <div class="card-title">Tools per Message</div>
+          <div class="card-value">${avgToolsPerMessage.toFixed(2)}</div>
+          <div class="card-subtitle">Tool density</div>
+        </div>
+        <div class="card">
+          <div class="card-title">Peak Day</div>
+          <div class="card-value">${(peakToolDay.toolCallCount || 0).toLocaleString()}</div>
+          <div class="card-subtitle">${peakToolDay.date}</div>
+        </div>
+      `;
+
+      // Use real tool usage data from session logs if available
+      let toolBreakdown;
+      let isRealData = false;
+
+      if (stats.toolUsage && Object.keys(stats.toolUsage).length > 0) {
+        // Real data from parsed session logs
+        toolBreakdown = stats.toolUsage;
+        isRealData = true;
+      } else {
+        // Fallback to estimates if session logs couldn't be parsed
+        toolBreakdown = {
+          'Bash': Math.round(totalToolCalls * 0.387),
+          'Read': Math.round(totalToolCalls * 0.247),
+          'Edit': Math.round(totalToolCalls * 0.106),
+          'TodoWrite': Math.round(totalToolCalls * 0.085),
+          'Write': Math.round(totalToolCalls * 0.070),
+          'Glob': Math.round(totalToolCalls * 0.041),
+          'Grep': Math.round(totalToolCalls * 0.017),
+          'Task': Math.round(totalToolCalls * 0.013),
+          'Other': Math.round(totalToolCalls * 0.034),
+        };
+      }
+
+      // Calculate actual total from tool breakdown (may differ from dailyActivity total)
+      const realToolTotal = Object.values(toolBreakdown).reduce((sum, count) => sum + count, 0);
+
+      // Tool names & usage panel
+      const sortedTools = Object.entries(toolBreakdown).sort((a, b) => b[1] - a[1]);
+      const toolColors = {
+        'Bash': '#ec4899',           // pink
+        'Read': 'var(--accent)',     // indigo
+        'Edit': 'var(--success)',    // green
+        'TodoWrite': '#8b5cf6',      // violet
+        'Write': 'var(--warning)',   // orange
+        'Glob': '#06b6d4',           // cyan
+        'Grep': '#84cc16',           // lime
+        'Task': '#f97316',           // orange-500
+        'TaskOutput': '#fb923c',     // orange-400
+        'AskUserQuestion': '#a78bfa',// violet-400
+        'WebFetch': '#22d3ee',       // cyan-400
+        'WebSearch': '#2dd4bf',      // teal-400
+        'NotebookEdit': '#fbbf24',   // amber-400
+        'Skill': '#e879f9',          // fuchsia-400
+        'EnterPlanMode': '#60a5fa',  // blue-400
+        'ExitPlanMode': '#38bdf8',   // sky-400
+        'KillShell': '#f87171',      // red-400
+        'Other': 'var(--text-secondary)'
+      };
+      document.getElementById('toolNamesUsage').innerHTML = `
+        ${sortedTools.map(([name, count]) => {
+          const percent = ((count / realToolTotal) * 100).toFixed(1);
+          const color = toolColors[name] || 'var(--text-secondary)';
+          return `
+            <div class="metric-row" style="margin-bottom: 0.5rem;">
+              <div style="display: flex; align-items: center; gap: 0.5rem;">
+                <span style="width: 8px; height: 8px; border-radius: 50%; background: ${color}; flex-shrink: 0;"></span>
+                <span class="metric-label">${name}</span>
+              </div>
+              <span class="metric-value">${count.toLocaleString()} <span style="color: var(--text-secondary); font-size: 0.75rem;">(${percent}%)</span></span>
+            </div>
+          `;
+        }).join('')}
+        <p style="color: var(--text-secondary); font-size: 0.7rem; margin-top: 1rem; padding-top: 0.75rem; border-top: 1px solid var(--border); font-style: italic;">
+          ${isRealData
+            ? `✓ Actual data from ${Object.keys(toolBreakdown).length} tool types (${realToolTotal.toLocaleString()} total calls parsed from session logs)`
+            : '* Estimates - session logs could not be parsed. Load .claude directory with projects/ folder for exact data.'}
+        </p>
+      `;
+
+      // Daily breakdown table
+      document.getElementById('toolStats').innerHTML = `
+        ${stats.dailyActivity.slice().reverse().map(d => {
+          const pct = stats.totalMessages > 0 ? ((d.toolCallCount || 0) / (d.messageCount || 1) * 100).toFixed(0) : 0;
+          return `
+            <div class="metric-row">
+              <span class="metric-label">${d.date}</span>
+              <span class="metric-value">${(d.toolCallCount || 0).toLocaleString()} calls <span style="color: var(--text-secondary); font-size: 0.75rem;">(${pct}% ratio)</span></span>
+            </div>
+          `;
+        }).join('')}
+      `;
+
+      // Tool insights
+      const highToolDays = stats.dailyActivity.filter(d => (d.toolCallCount || 0) > totalToolCalls / stats.dailyActivity.length);
+      document.getElementById('toolInsights').innerHTML = `
+        <div class="metric-row">
+          <span class="metric-label">High Activity Days</span>
+          <span class="metric-value">${highToolDays.length} days</span>
+        </div>
+        <div class="metric-row">
+          <span class="metric-label">Avg Tool:Message Ratio</span>
+          <span class="metric-value">${(avgToolsPerMessage * 100).toFixed(1)}%</span>
+        </div>
+        <div class="metric-row">
+          <span class="metric-label">Most Active Date</span>
+          <span class="metric-value">${peakToolDay.date}</span>
+        </div>
+        <div class="metric-row">
+          <span class="metric-label">Daily Average</span>
+          <span class="metric-value">${(totalToolCalls / stats.dailyActivity.length).toFixed(0)} calls</span>
+        </div>
+      `;
+
+      // Tool calls over time chart
+      renderChart('toolsChart', {
+        type: 'bar',
+        data: {
+          labels: stats.dailyActivity.map(d => d.date),
+          datasets: [{
+            label: 'Tool Calls',
+            data: stats.dailyActivity.map(d => d.toolCallCount),
+            backgroundColor: 'rgba(245, 158, 11, 0.8)',
+          }]
+        },
+        options: getChartOptions('Tool Calls per Day')
+      });
+
+      // Tool types doughnut chart - colors match the tool list (extended for all tool types)
+      const chartToolColors = {
+        'Bash': 'rgba(236, 72, 153, 0.8)',      // pink
+        'Read': 'rgba(99, 102, 241, 0.8)',      // indigo
+        'Edit': 'rgba(16, 185, 129, 0.8)',      // green
+        'TodoWrite': 'rgba(139, 92, 246, 0.8)', // violet
+        'Write': 'rgba(245, 158, 11, 0.8)',     // orange
+        'Glob': 'rgba(6, 182, 212, 0.8)',       // cyan
+        'Grep': 'rgba(132, 204, 22, 0.8)',      // lime
+        'Task': 'rgba(249, 115, 22, 0.8)',      // orange-500
+        'TaskOutput': 'rgba(251, 146, 60, 0.8)',// orange-400
+        'AskUserQuestion': 'rgba(167, 139, 250, 0.8)', // violet-400
+        'WebFetch': 'rgba(34, 211, 238, 0.8)',  // cyan-400
+        'WebSearch': 'rgba(45, 212, 191, 0.8)', // teal-400
+        'NotebookEdit': 'rgba(251, 191, 36, 0.8)', // amber-400
+        'Skill': 'rgba(232, 121, 249, 0.8)',    // fuchsia-400
+        'EnterPlanMode': 'rgba(96, 165, 250, 0.8)', // blue-400
+        'ExitPlanMode': 'rgba(56, 189, 248, 0.8)', // sky-400
+        'KillShell': 'rgba(248, 113, 113, 0.8)',   // red-400
+        'Other': 'rgba(148, 163, 184, 0.8)'     // gray
+      };
+
+      // Generate color for any tool not in the list
+      const getToolColor = (toolName) => {
+        if (chartToolColors[toolName]) return chartToolColors[toolName];
+        // For MCP tools and others, generate a consistent color based on name
+        if (toolName.startsWith('MCP:')) return 'rgba(147, 51, 234, 0.8)'; // purple for MCP
+        return 'rgba(148, 163, 184, 0.8)'; // default gray
+      };
+
+      renderChart('toolTypesChart', {
+        type: 'doughnut',
+        data: {
+          labels: sortedTools.map(t => t[0]),
+          datasets: [{
+            data: sortedTools.map(t => t[1]),
+            backgroundColor: sortedTools.map(t => getToolColor(t[0])),
+            borderColor: 'var(--bg-primary)',
+            borderWidth: 2
+          }]
+        },
+        options: {
+          responsive: true,
+          maintainAspectRatio: false,
+          plugins: {
+            legend: { position: 'right', labels: { color: '#94a3b8', font: { size: 11 }, boxWidth: 12 } },
+            tooltip: {
+              callbacks: {
+                label: function(context) {
+                  const value = context.raw;
+                  const percent = ((value / realToolTotal) * 100).toFixed(1);
+                  return `${context.label}: ${value.toLocaleString()} (${percent}%)`;
+                }
+              }
+            }
+          }
+        }
+      });
+
+      // Auto-render Bash details if bash commands were parsed
+      if (stats.bashCommands && stats.bashCommands.length > 0) {
+        bashData = processBashCommands(stats.bashCommands);
+        renderBashDetails();
+      } else {
+        document.getElementById('bashDetailsContent').innerHTML = `
+          <div style="text-align: center; padding: 2rem; color: var(--text-secondary);">
+            <div style="font-size: 2rem; margin-bottom: 0.5rem;">📝</div>
+            <p>No Bash commands found in session logs.</p>
+          </div>
+        `;
+        document.getElementById('bashChartsSection').style.display = 'none';
+        document.getElementById('bashCommandsList').style.display = 'none';
+      }
+
+      // Projects view - Enhanced with empty state handling
+      const projectCounts = {};
+      history.forEach(h => {
+        if (h.project) {
+          const name = h.project.split('/').pop();
+          projectCounts[name] = (projectCounts[name] || 0) + 1;
+        }
+      });
+
+      const sortedProjects = Object.entries(projectCounts).sort((a, b) => b[1] - a[1]);
+      const hasProjectData = sortedProjects.length > 0;
+
+      // Show/hide empty state
+      document.getElementById('projectsEmptyState').style.display = hasProjectData ? 'none' : 'block';
+      document.querySelector('#projects .grid-2').style.display = hasProjectData ? 'grid' : 'none';
+      document.getElementById('projectsCards').style.display = hasProjectData ? 'flex' : 'none';
+
+      if (hasProjectData) {
+        const totalProjectMessages = sortedProjects.reduce((sum, [, count]) => sum + count, 0);
+        const topProject = sortedProjects[0];
+        const avgMessagesPerProject = totalProjectMessages / sortedProjects.length;
+
+        // Project summary cards
+        document.getElementById('projectsCards').innerHTML = `
+          <div class="card">
+            <div class="card-title">Total Projects</div>
+            <div class="card-value">${sortedProjects.length}</div>
+            <div class="card-subtitle">Unique project directories</div>
+          </div>
+          <div class="card">
+            <div class="card-title">Top Project</div>
+            <div class="card-value">${topProject[0]}</div>
+            <div class="card-subtitle">${topProject[1]} sessions</div>
+          </div>
+          <div class="card">
+            <div class="card-title">Avg Sessions/Project</div>
+            <div class="card-value">${avgMessagesPerProject.toFixed(1)}</div>
+            <div class="card-subtitle">Mean distribution</div>
+          </div>
+          <div class="card">
+            <div class="card-title">Project Coverage</div>
+            <div class="card-value">${((topProject[1] / totalProjectMessages) * 100).toFixed(1)}%</div>
+            <div class="card-subtitle">Top project share</div>
+          </div>
+        `;
+
+        renderChart('projectsChart', {
+          type: 'bar',
+          data: {
+            labels: sortedProjects.slice(0, 10).map(p => p[0]),
+            datasets: [{
+              label: 'Sessions',
+              data: sortedProjects.slice(0, 10).map(p => p[1]),
+              backgroundColor: 'rgba(99, 102, 241, 0.8)',
+            }]
+          },
+          options: { ...getChartOptions('Sessions by Project'), indexAxis: 'y' }
+        });
+
+        document.getElementById('projectList').innerHTML = sortedProjects.map(([name, count], i) => `
+          <div class="metric-row">
+            <span class="metric-label">
+              <span style="color: var(--text-secondary); margin-right: 0.5rem;">#${i + 1}</span>
+              ${name}
+            </span>
+            <span class="metric-value">${count} sessions <span style="color: var(--text-secondary); font-size: 0.75rem;">(${((count / totalProjectMessages) * 100).toFixed(1)}%)</span></span>
+          </div>
+        `).join('');
+      } else {
+        // Clear charts when no data
+        if (charts['projectsChart']) {
+          charts['projectsChart'].destroy();
+          delete charts['projectsChart'];
+        }
+        document.getElementById('projectList').innerHTML = '';
+      }
+
+      // Network view - API Call focused (using real counts from session logs)
+      const networkApiCalls = stats.totalApiCalls || 0;
+      const avgApiCallsPerDay = networkApiCalls / stats.dailyActivity.length;
+      const avgApiCallsPerSession = networkApiCalls / stats.totalSessions;
+      const totalTokens = totalInputTokens + totalOutputTokens + totalCacheRead + totalCacheCreate;
+      const avgTokensPerCall = networkApiCalls > 0 ? totalTokens / networkApiCalls : 0;
+
+      // Calculate real API calls per day from dateMetrics
+      const apiCallsByDate = {};
+      if (stats.dateMetrics) {
+        for (const [date, metrics] of Object.entries(stats.dateMetrics)) {
+          apiCallsByDate[date] = metrics.apiCalls;
+        }
+      }
+      const dailyApiData = stats.dailyActivity.map(d => apiCallsByDate[d.date] || 0);
+      const peakApiDayIdx = dailyApiData.reduce((maxIdx, val, idx, arr) => val > arr[maxIdx] ? idx : maxIdx, 0);
+      const peakApiDay = {
+        date: stats.dailyActivity[peakApiDayIdx]?.date || '-',
+        apiCalls: dailyApiData[peakApiDayIdx] || 0
+      };
+
+      // Calculate real API calls by model from dateMetrics
+      const modelApiCalls = {};
+      if (stats.dateMetrics) {
+        for (const [date, metrics] of Object.entries(stats.dateMetrics)) {
+          for (const [model, data] of Object.entries(metrics.models || {})) {
+            const shortModel = model.split('-').slice(1, 3).join(' ');
+            modelApiCalls[shortModel] = (modelApiCalls[shortModel] || 0) + 1; // Each entry is an API call
+          }
+        }
+      }
+      // Alternative: count from sessionDetails
+      const modelCallCounts = {};
+      if (stats.sessionDetails) {
+        for (const session of Object.values(stats.sessionDetails)) {
+          for (const model of session.models || []) {
+            const shortModel = model.split('-').slice(1, 3).join(' ');
+            modelCallCounts[shortModel] = (modelCallCounts[shortModel] || 0) + session.apiCalls;
+          }
+        }
+      }
+
+      document.getElementById('networkCards').innerHTML = `
+        <div class="card">
+          <div class="card-title">Total API Calls</div>
+          <div class="card-value">${networkApiCalls.toLocaleString()}</div>
+          <div class="card-subtitle">From session logs</div>
+        </div>
+        <div class="card">
+          <div class="card-title">API Calls per Day</div>
+          <div class="card-value">${avgApiCallsPerDay.toFixed(0)}</div>
+          <div class="card-subtitle">Average daily requests</div>
+        </div>
+        <div class="card">
+          <div class="card-title">Data Transferred</div>
+          <div class="card-value">${formatBytes(bytesSent + bytesReceived)}</div>
+          <div class="card-subtitle">Derived from tokens</div>
+        </div>
+        <div class="card">
+          <div class="card-title">Peak API Day</div>
+          <div class="card-value">${peakApiDay.apiCalls.toLocaleString()}</div>
+          <div class="card-subtitle">${peakApiDay.date}</div>
+        </div>
+      `;
+
+      // Daily API calls chart
+      renderChart('dailyApiChart', {
+        type: 'bar',
+        data: {
+          labels: stats.dailyActivity.map(d => d.date),
+          datasets: [{
+            label: 'API Calls (from session logs)',
+            data: dailyApiData,
+            backgroundColor: 'rgba(99, 102, 241, 0.8)',
+          }, {
+            label: 'Sessions',
+            data: stats.dailyActivity.map(d => d.sessionCount),
+            backgroundColor: 'rgba(16, 185, 129, 0.8)',
+          }]
+        },
+        options: getChartOptions('Daily API Activity')
+      });
+
+      // API Calls by Model chart (using real counts)
+      const modelLabels = Object.keys(modelCallCounts).length > 0 ? Object.keys(modelCallCounts) : ['No data'];
+      const modelCounts = Object.keys(modelCallCounts).length > 0 ? Object.values(modelCallCounts) : [0];
+      const modelColors = ['rgba(99, 102, 241, 0.8)', 'rgba(16, 185, 129, 0.8)', 'rgba(245, 158, 11, 0.8)', 'rgba(236, 72, 153, 0.8)'];
+
+      renderChart('apiTypeChart', {
+        type: 'doughnut',
+        data: {
+          labels: modelLabels.map(m => `Messages API (${m})`),
+          datasets: [{
+            data: modelCounts,
+            backgroundColor: modelColors.slice(0, modelLabels.length),
+            borderColor: 'var(--bg-primary)',
+            borderWidth: 2
+          }]
+        },
+        options: {
+          responsive: true,
+          maintainAspectRatio: false,
+          plugins: {
+            legend: { position: 'bottom', labels: { color: '#94a3b8', font: { size: 11 } } },
+            tooltip: {
+              callbacks: {
+                label: function(context) {
+                  const value = context.raw;
+                  const percent = ((value / totalApiCalls) * 100).toFixed(1);
+                  return `${context.label}: ${value.toLocaleString()} calls (${percent}%)`;
+                }
+              }
+            }
+          }
+        }
+      });
+
+      // API Stats panel
+      document.getElementById('apiStats').innerHTML = `
+        <div class="metric-row">
+          <span class="metric-label">Total API Calls</span>
+          <span class="metric-value">${totalApiCalls.toLocaleString()}</span>
+        </div>
+        <div class="metric-row">
+          <span class="metric-label">Avg Calls per Session</span>
+          <span class="metric-value">${avgApiCallsPerSession.toFixed(1)}</span>
+        </div>
+        <div class="metric-row">
+          <span class="metric-label">Avg Tokens per Call</span>
+          <span class="metric-value">${formatTokens(avgTokensPerCall)}</span>
+        </div>
+        <div class="metric-row">
+          <span class="metric-label">Peak Day Calls</span>
+          <span class="metric-value">${peakApiDay.apiCalls.toLocaleString()} (${peakApiDay.date})</span>
+        </div>
+        <div class="metric-row">
+          <span class="metric-label">Active Days</span>
+          <span class="metric-value">${stats.dailyActivity.length} days</span>
+        </div>
+        <div class="metric-row">
+          <span class="metric-label">Active Hours</span>
+          <span class="metric-value">${activeHours} unique hours</span>
+        </div>
+      `;
+
+      // Data transfer panel
+      document.getElementById('networkMetrics').innerHTML = `
+        <div class="metric-row">
+          <span class="metric-label">Est. Bytes Sent</span>
+          <span class="metric-value">${formatBytes(bytesSent)}</span>
+        </div>
+        <div class="metric-row">
+          <span class="metric-label">Est. Bytes Received</span>
+          <span class="metric-value">${formatBytes(bytesReceived)}</span>
+        </div>
+        <div class="metric-row">
+          <span class="metric-label">Total Data Transfer</span>
+          <span class="metric-value">${formatBytes(bytesSent + bytesReceived)}</span>
+        </div>
+        <div class="metric-row">
+          <span class="metric-label">Avg Data per Call</span>
+          <span class="metric-value">${formatBytes((bytesSent + bytesReceived) / totalApiCalls)}</span>
+        </div>
+        <p style="color: var(--text-secondary); font-size: 0.75rem; margin-top: 1rem; padding-top: 0.75rem; border-top: 1px solid var(--border);">
+          Estimates based on ~4 bytes per token. Actual network traffic may vary due to protocol overhead, compression, and streaming.
+        </p>
+      `;
+
+      // Custom metrics
+      renderCustomMetrics();
+
+      // Prompts tab
+      renderPromptsTab();
+    }
+
+    function renderChart(id, config) {
+      if (charts[id]) {
+        charts[id].destroy();
+      }
+      const ctx = document.getElementById(id).getContext('2d');
+      charts[id] = new Chart(ctx, config);
+    }
+
+    function getChartOptions(title) {
+      return {
+        responsive: true,
+        maintainAspectRatio: false,
+        plugins: {
+          legend: { labels: { color: '#f1f5f9' } }
+        },
+        scales: {
+          x: { ticks: { color: '#94a3b8' }, grid: { color: '#334155' } },
+          y: { ticks: { color: '#94a3b8' }, grid: { color: '#334155' } }
+        }
+      };
+    }
+
+    function calculateCost(modelUsage) {
+      const pricing = {
+        'claude-opus-4-5-20251101': { input: 15, output: 75, cacheRead: 1.5, cacheCreate: 18.75 },
+        'claude-sonnet-4-5-20250929': { input: 3, output: 15, cacheRead: 0.3, cacheCreate: 3.75 },
+        'claude-sonnet-4-20250514': { input: 3, output: 15, cacheRead: 0.3, cacheCreate: 3.75 },
+      };
+
+      let total = 0;
+      for (const [model, usage] of Object.entries(modelUsage)) {
+        const p = pricing[model] || pricing['claude-opus-4-5-20251101'];
+        total += (usage.inputTokens || 0) * p.input / 1000000;
+        total += (usage.outputTokens || 0) * p.output / 1000000;
+        total += (usage.cacheReadInputTokens || 0) * p.cacheRead / 1000000;
+        total += (usage.cacheCreationInputTokens || 0) * p.cacheCreate / 1000000;
+      }
+      return total;
+    }
+
+    function calculateModelCost(model, usage) {
+      const pricing = {
+        'claude-opus-4-5-20251101': { input: 15, output: 75, cacheRead: 1.5, cacheCreate: 18.75 },
+        'claude-sonnet-4-5-20250929': { input: 3, output: 15, cacheRead: 0.3, cacheCreate: 3.75 },
+        'claude-sonnet-4-20250514': { input: 3, output: 15, cacheRead: 0.3, cacheCreate: 3.75 },
+      };
+      const p = pricing[model] || pricing['claude-opus-4-5-20251101'];
+      let cost = 0;
+      cost += (usage.inputTokens || 0) * p.input / 1000000;
+      cost += (usage.outputTokens || 0) * p.output / 1000000;
+      cost += (usage.cacheReadInputTokens || 0) * p.cacheRead / 1000000;
+      cost += (usage.cacheCreationInputTokens || 0) * p.cacheCreate / 1000000;
+      return cost;
+    }
+
+    function calculateCacheSavings(modelUsage) {
+      const pricing = {
+        'claude-opus-4-5-20251101': { input: 15, output: 75, cacheRead: 1.5, cacheCreate: 18.75 },
+        'claude-sonnet-4-5-20250929': { input: 3, output: 15, cacheRead: 0.3, cacheCreate: 3.75 },
+        'claude-sonnet-4-20250514': { input: 3, output: 15, cacheRead: 0.3, cacheCreate: 3.75 },
+      };
+
+      let costWithCache = 0;
+      let costWithoutCache = 0;
+      let totalCacheRead = 0;
+      let totalInput = 0;
+
+      for (const [model, usage] of Object.entries(modelUsage)) {
+        const p = pricing[model] || pricing['claude-opus-4-5-20251101'];
+        const cacheRead = usage.cacheReadInputTokens || 0;
+        const cacheCreate = usage.cacheCreationInputTokens || 0;
+        const input = usage.inputTokens || 0;
+        const output = usage.outputTokens || 0;
+
+        totalCacheRead += cacheRead;
+        totalInput += input;
+
+        // Actual cost WITH caching
+        costWithCache += input * p.input / 1000000;
+        costWithCache += output * p.output / 1000000;
+        costWithCache += cacheRead * p.cacheRead / 1000000;
+        costWithCache += cacheCreate * p.cacheCreate / 1000000;
+
+        // Hypothetical cost WITHOUT caching (cache reads billed at full input price)
+        costWithoutCache += input * p.input / 1000000;
+        costWithoutCache += output * p.output / 1000000;
+        costWithoutCache += cacheRead * p.input / 1000000;  // Full price instead of cache price
+        costWithoutCache += cacheCreate * p.cacheCreate / 1000000;
+      }
+
+      const cacheHitRate = totalCacheRead / (totalCacheRead + totalInput) * 100;
+
+      return {
+        costWithCache,
+        costWithoutCache,
+        savings: costWithoutCache - costWithCache,
+        totalCacheRead,
+        totalInput,
+        cacheHitRate
+      };
+    }
+
+    function formatTokens(n) {
+      if (n >= 1000000000) return (n / 1000000000).toFixed(2) + 'B';
+      if (n >= 1000000) return (n / 1000000).toFixed(2) + 'M';
+      if (n >= 1000) return (n / 1000).toFixed(1) + 'K';
+      return n.toString();
+    }
+
+    function formatTokensCompact(n) {
+      if (n >= 1000000) return (n / 1000000).toFixed(1) + 'M';
+      if (n >= 1000) return (n / 1000).toFixed(0) + 'K';
+      return n.toString();
+    }
+
+    function formatDuration(ms) {
+      if (!ms || ms <= 0) return '-';
+      const seconds = Math.floor(ms / 1000);
+      const minutes = Math.floor(seconds / 60);
+      const hours = Math.floor(minutes / 60);
+      const days = Math.floor(hours / 24);
+
+      if (days > 0) return `${days}d ${hours % 24}h`;
+      if (hours > 0) return `${hours}h ${minutes % 60}m`;
+      if (minutes > 0) return `${minutes}m`;
+      return `${seconds}s`;
+    }
+
+    function formatBytes(n) {
+      if (n >= 1000000000) return (n / 1000000000).toFixed(2) + ' GB';
+      if (n >= 1000000) return (n / 1000000).toFixed(2) + ' MB';
+      if (n >= 1000) return (n / 1000).toFixed(1) + ' KB';
+      return n + ' B';
+    }
+
+    // Load example metric into the form
+    function loadExampleMetric(name, formula) {
+      document.getElementById('metricName').value = name;
+      document.getElementById('metricFormula').value = formula;
+      // Scroll to the form
+      document.getElementById('metricName').focus();
+    }
+
+    function addCustomMetric() {
+      const name = document.getElementById('metricName').value;
+      const formula = document.getElementById('metricFormula').value;
+
+      if (!name || !formula) {
+        alert('Please enter both name and formula');
+        return;
+      }
+
+      // Check for duplicate names
+      if (customMetrics.some(m => m.name === name)) {
+        alert('A metric with this name already exists');
+        return;
+      }
+
+      customMetrics.push({ name, formula });
+      localStorage.setItem('customMetrics', JSON.stringify(customMetrics));
+      document.getElementById('metricName').value = '';
+      document.getElementById('metricFormula').value = '';
+      renderCustomMetrics();
+    }
+
+    function renderCustomMetrics() {
+      if (!data) {
+        document.getElementById('customMetricsList').innerHTML = `
+          <p style="color: var(--text-secondary); text-align: center; padding: 1rem;">
+            Load your data first to see custom metric calculations.<br>
+            <span style="font-size: 0.75rem;">Click "Load .claude Directory" above to get started.</span>
+          </p>
+        `;
+        return;
+      }
+
+      const { stats, history } = data;
+
+      // Calculate total cost for the context
+      const costCalc = calculateCacheSavings(stats.modelUsage);
+
+      const context = {
+        totalMessages: stats.totalMessages,
+        totalSessions: stats.totalSessions,
+        totalToolCalls: stats.dailyActivity.reduce((sum, d) => sum + (d.toolCallCount || 0), 0),
+        activeDays: stats.dailyActivity.length,
+        activeHours: Object.keys(stats.hourCounts || {}).length,
+        inputTokens: Object.values(stats.modelUsage).reduce((sum, m) => sum + (m.inputTokens || 0), 0),
+        outputTokens: Object.values(stats.modelUsage).reduce((sum, m) => sum + (m.outputTokens || 0), 0),
+        cacheReadTokens: Object.values(stats.modelUsage).reduce((sum, m) => sum + (m.cacheReadInputTokens || 0), 0),
+        cacheCreationTokens: Object.values(stats.modelUsage).reduce((sum, m) => sum + (m.cacheCreationInputTokens || 0), 0),
+        totalCost: costCalc.costWithCache,
+        cacheSavings: costCalc.savings,
+      };
+
+      if (customMetrics.length === 0) {
+        document.getElementById('customMetricsList').innerHTML = `
+          <p style="color: var(--text-secondary); text-align: center; padding: 1rem;">
+            No custom metrics defined yet.<br>
+            <span style="font-size: 0.75rem;">Click an example above or create your own formula!</span>
+          </p>
+        `;
+        return;
+      }
+
+      const html = customMetrics.map((metric, i) => {
+        let value = 'Error';
+        let displayValue = '';
+        try {
+          const fn = new Function(...Object.keys(context), `return ${metric.formula}`);
+          value = fn(...Object.values(context));
+          if (typeof value === 'number') {
+            // Format based on size
+            if (value > 1000000) {
+              displayValue = (value / 1000000).toFixed(2) + 'M';
+            } else if (value > 1000) {
+              displayValue = (value / 1000).toFixed(2) + 'K';
+            } else if (value < 1 && value > 0) {
+              displayValue = value.toFixed(4);
+            } else {
+              displayValue = value.toFixed(2);
+            }
+          } else {
+            displayValue = value;
+          }
+        } catch (e) {
+          displayValue = '<span style="color: var(--error);">Invalid formula</span>';
+        }
+        return `
+          <div class="metric-row" style="align-items: center;">
+            <div>
+              <span class="metric-label">${metric.name}</span>
+              <div style="font-size: 0.7rem; color: var(--text-secondary); margin-top: 0.25rem;"><code>${metric.formula}</code></div>
+            </div>
+            <span class="metric-value">
+              ${displayValue}
+              <button onclick="removeMetric(${i})" style="background: var(--error); padding: 0.25rem 0.5rem; font-size: 0.75rem; margin-left: 0.5rem; border-radius: 4px;">×</button>
+            </span>
+          </div>
+        `;
+      }).join('');
+
+      document.getElementById('customMetricsList').innerHTML = html;
+    }
+
+    function removeMetric(index) {
+      customMetrics.splice(index, 1);
+      localStorage.setItem('customMetrics', JSON.stringify(customMetrics));
+      renderCustomMetrics();
+    }
+
+    // Prompts Tab
+    function renderPromptsTab() {
+      if (!data) return;
+      const { stats } = data;
+      const prompts = stats.prompts || [];
+
+      // Get unique projects for filter dropdown
+      const projects = [...new Set(prompts.filter(p => p.project).map(p => p.project))].sort();
+      const projectSelect = document.getElementById('promptProjectFilter');
+      projectSelect.innerHTML = '<option value="">All Projects</option>' +
+        projects.map(p => `<option value="${p}">${p}</option>`).join('');
+
+      // Calculate summary stats
+      const userPrompts = prompts.filter(p => p.type === 'user');
+      const assistantResponses = prompts.filter(p => p.type === 'assistant');
+      const withToolCalls = assistantResponses.filter(p => p.toolCalls > 0);
+      const withThinking = assistantResponses.filter(p => p.hasThinking);
+
+      // Agent loop metrics
+      const totalToolCalls = assistantResponses.reduce((sum, p) => sum + (p.toolCalls || 0), 0);
+      const avgToolsPerTurn = assistantResponses.length > 0 ? (totalToolCalls / assistantResponses.length).toFixed(1) : 0;
+      const thinkingRate = assistantResponses.length > 0 ? ((withThinking.length / assistantResponses.length) * 100).toFixed(1) : 0;
+
+      // Model distribution
+      const modelCounts = {};
+      assistantResponses.forEach(p => {
+        if (p.model) {
+          const shortModel = p.model.includes('opus') ? 'Opus' : p.model.includes('sonnet') ? 'Sonnet' : p.model.includes('haiku') ? 'Haiku' : 'Other';
+          modelCounts[shortModel] = (modelCounts[shortModel] || 0) + 1;
+        }
+      });
+
+      // Turn type distribution
+      const textOnlyTurns = assistantResponses.filter(p => p.toolCalls === 0 && !p.hasThinking).length;
+      const toolUsingTurns = withToolCalls.length;
+      const thinkingTurns = withThinking.length;
+
+      // Summary cards - Agent Loop focused
+      document.getElementById('promptsCards').innerHTML = `
+        <div class="card">
+          <div class="card-title">User Prompts</div>
+          <div class="card-value">${userPrompts.length.toLocaleString()}</div>
+          <div class="card-subtitle">${projects.length} projects</div>
+        </div>
+        <div class="card">
+          <div class="card-title">Avg Tools/Turn</div>
+          <div class="card-value">${avgToolsPerTurn}</div>
+          <div class="card-subtitle">${totalToolCalls.toLocaleString()} total tool calls</div>
+        </div>
+        <div class="card">
+          <div class="card-title">Thinking Rate</div>
+          <div class="card-value">${thinkingRate}%</div>
+          <div class="card-subtitle">${withThinking.length.toLocaleString()} responses</div>
+        </div>
+        <div class="card">
+          <div class="card-title">Model Mix</div>
+          <div class="card-value">${Object.keys(modelCounts).length}</div>
+          <div class="card-subtitle">${Object.entries(modelCounts).map(([m, c]) => `${m}: ${c}`).join(', ')}</div>
+        </div>
+      `;
+
+      // Render charts and prompts list
+      renderAgentLoopCharts(modelCounts, textOnlyTurns, toolUsingTurns, thinkingTurns);
+      renderPromptsList(userPrompts);
+    }
+
+    function renderAgentLoopCharts(modelCounts, textOnly, toolUsing, thinking) {
+      // Check if chart containers exist, if not skip
+      const modelChartEl = document.getElementById('modelDistChart');
+      const turnChartEl = document.getElementById('turnTypeChart');
+      if (!modelChartEl || !turnChartEl) return;
+
+      // Calculate model percentages
+      const modelTotal = Object.values(modelCounts).reduce((a, b) => a + b, 0);
+      const modelLabelsWithPct = Object.entries(modelCounts).map(([name, count]) => {
+        const pct = modelTotal > 0 ? ((count / modelTotal) * 100).toFixed(1) : 0;
+        return `${name} (${pct}%)`;
+      });
+
+      // Model distribution pie chart
+      const modelColors = {
+        'Opus': '#8b5cf6',
+        'Sonnet': '#3b82f6',
+        'Haiku': '#10b981',
+        'Other': '#6b7280'
+      };
+      renderChart('modelDistChart', {
+        type: 'doughnut',
+        data: {
+          labels: modelLabelsWithPct,
+          datasets: [{
+            data: Object.values(modelCounts),
+            backgroundColor: Object.keys(modelCounts).map(m => modelColors[m] || '#6b7280')
+          }]
+        },
+        options: {
+          responsive: true,
+          maintainAspectRatio: false,
+          plugins: {
+            legend: { position: 'bottom', labels: { color: '#9ca3af' } }
+          }
+        }
+      });
+
+      // Calculate turn type percentages
+      const turnTotal = textOnly + toolUsing + thinking;
+      const textPct = turnTotal > 0 ? ((textOnly / turnTotal) * 100).toFixed(1) : 0;
+      const toolPct = turnTotal > 0 ? ((toolUsing / turnTotal) * 100).toFixed(1) : 0;
+      const thinkPct = turnTotal > 0 ? ((thinking / turnTotal) * 100).toFixed(1) : 0;
+
+      // Turn type bar chart
+      renderChart('turnTypeChart', {
+        type: 'bar',
+        data: {
+          labels: [`Text Only (${textPct}%)`, `Tool Using (${toolPct}%)`, `With Thinking (${thinkPct}%)`],
+          datasets: [{
+            data: [textOnly, toolUsing, thinking],
+            backgroundColor: ['#3b82f6', '#f59e0b', '#8b5cf6']
+          }]
+        },
+        options: {
+          responsive: true,
+          maintainAspectRatio: false,
+          plugins: { legend: { display: false } },
+          scales: {
+            y: { beginAtZero: true, ticks: { color: '#9ca3af' }, grid: { color: '#374151' } },
+            x: { ticks: { color: '#9ca3af' }, grid: { display: false } }
+          }
+        }
+      });
+    }
+
+    function renderPromptsList(userPrompts) {
+      const searchTerm = (document.getElementById('promptSearch')?.value || '').toLowerCase();
+      const projectFilter = document.getElementById('promptProjectFilter')?.value || '';
+      const sourceFilter = document.getElementById('promptSourceFilter')?.value || '';
+
+      // Filter prompts
+      let filtered = userPrompts;
+      if (searchTerm) {
+        filtered = filtered.filter(p => p.content.toLowerCase().includes(searchTerm));
+      }
+      if (projectFilter) {
+        filtered = filtered.filter(p => p.project === projectFilter);
+      }
+      if (sourceFilter) {
+        filtered = filtered.filter(p => p.source === sourceFilter);
+      }
+
+      // Sort by timestamp descending (most recent first)
+      filtered.sort((a, b) => new Date(b.timestamp) - new Date(a.timestamp));
+
+      // Limit to 200 for performance
+      const displayed = filtered.slice(0, 200);
+
+      // Helper for source badge
+      const getSourceBadge = (source) => {
+        const colors = {
+          user: '#10b981',    // green
+          system: '#8b5cf6',  // purple
+          tool_result: '#f59e0b'  // amber
+        };
+        const labels = {
+          user: 'User',
+          system: 'System',
+          tool_result: 'Tool'
+        };
+        const color = colors[source] || '#6b7280';
+        const label = labels[source] || source || 'Unknown';
+        return `<span style="display: inline-block; padding: 2px 6px; border-radius: 4px; font-size: 0.7rem; background: ${color}22; color: ${color}; border: 1px solid ${color}44;">${label}</span>`;
+      };
+
+      const html = displayed.length === 0
+        ? '<p style="text-align: center; color: var(--text-secondary); padding: 2rem;">No prompts found</p>'
+        : `
+          <table style="width: 100%; border-collapse: collapse; font-size: 0.875rem;">
+            <thead>
+              <tr style="border-bottom: 1px solid var(--border);">
+                <th style="text-align: left; padding: 0.5rem; color: var(--text-secondary); width: 140px;">Time</th>
+                <th style="text-align: left; padding: 0.5rem; color: var(--text-secondary); width: 70px;">Source</th>
+                <th style="text-align: left; padding: 0.5rem; color: var(--text-secondary); width: 120px;">Project</th>
+                <th style="text-align: left; padding: 0.5rem; color: var(--text-secondary);">Prompt</th>
+              </tr>
+            </thead>
+            <tbody>
+              ${displayed.map(p => `
+                <tr style="border-bottom: 1px solid var(--border); cursor: pointer;" onclick="showPromptDetail('${p.uuid}', '${p.sessionId}')">
+                  <td style="padding: 0.5rem; color: var(--text-secondary); white-space: nowrap; vertical-align: top;">
+                    ${formatTimestamp(p.timestamp)}
+                  </td>
+                  <td style="padding: 0.5rem; vertical-align: top;">
+                    ${getSourceBadge(p.source)}
+                  </td>
+                  <td style="padding: 0.5rem; color: var(--accent); vertical-align: top;">
+                    ${p.project || '-'}
+                  </td>
+                  <td style="padding: 0.5rem; vertical-align: top;">
+                    <div style="max-height: 60px; overflow: hidden; text-overflow: ellipsis;">
+                      ${escapeHtml(p.content.slice(0, 200))}${p.content.length > 200 ? '...' : ''}
+                    </div>
+                  </td>
+                </tr>
+              `).join('')}
+            </tbody>
+          </table>
+          ${filtered.length > 200 ? `<p style="text-align: center; color: var(--text-secondary); padding: 1rem;">Showing 200 of ${filtered.length.toLocaleString()} prompts</p>` : ''}
+        `;
+
+      document.getElementById('promptsList').innerHTML = html;
+    }
+
+    function formatTimestamp(ts) {
+      if (!ts) return '-';
+      const d = new Date(ts);
+      return d.toLocaleDateString() + ' ' + d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+    }
+
+    function escapeHtml(text) {
+      const div = document.createElement('div');
+      div.textContent = text;
+      return div.innerHTML;
+    }
+
+    function showPromptDetail(uuid, sessionId) {
+      if (!data) return;
+      const prompts = data.stats.prompts || [];
+
+      // Find the user prompt and subsequent assistant response
+      const userPrompt = prompts.find(p => p.uuid === uuid);
+      if (!userPrompt) return;
+
+      // Find assistant response (next assistant entry in same session after this prompt)
+      const sessionPrompts = prompts
+        .filter(p => p.sessionId === sessionId)
+        .sort((a, b) => new Date(a.timestamp) - new Date(b.timestamp));
+
+      const promptIndex = sessionPrompts.findIndex(p => p.uuid === uuid);
+      const response = promptIndex >= 0 ? sessionPrompts.slice(promptIndex + 1).find(p => p.type === 'assistant') : null;
+
+      let html = `
+        <h3 style="color: var(--accent); margin-bottom: 1rem;">Conversation Detail</h3>
+        <div style="margin-bottom: 0.5rem; color: var(--text-secondary); font-size: 0.875rem;">
+          ${formatTimestamp(userPrompt.timestamp)} | ${userPrompt.project || 'Unknown Project'}
+        </div>
+
+        <div style="margin-top: 1.5rem;">
+          <div style="color: var(--success); font-weight: 600; margin-bottom: 0.5rem;">User Prompt:</div>
+          <div style="background: var(--bg-secondary); padding: 1rem; border-radius: 6px; white-space: pre-wrap; font-family: monospace; font-size: 0.875rem; max-height: 300px; overflow-y: auto;">
+${escapeHtml(userPrompt.content)}
+          </div>
+        </div>
+      `;
+
+      if (response) {
+        // Model badge
+        const modelBadge = response.model
+          ? `<span style="background: ${response.model.includes('opus') ? '#8b5cf6' : response.model.includes('sonnet') ? '#3b82f6' : '#10b981'}; color: white; padding: 0.2rem 0.5rem; border-radius: 4px; font-size: 0.75rem; margin-left: 0.5rem;">${response.model.includes('opus') ? 'Opus' : response.model.includes('sonnet') ? 'Sonnet' : 'Haiku'}</span>`
+          : '';
+
+        html += `
+          <div style="margin-top: 1.5rem;">
+            <div style="color: var(--accent); font-weight: 600; margin-bottom: 0.5rem;">
+              Assistant Response${modelBadge}
+              ${response.hasThinking ? `<span style="color: var(--warning); font-weight: normal; margin-left: 0.5rem;">[thinking]</span>` : ''}
+              ${response.isSidechain ? `<span style="color: #f97316; font-weight: normal; margin-left: 0.5rem;">[subagent]</span>` : ''}
+            </div>
+            <div style="background: var(--bg-secondary); padding: 1rem; border-radius: 6px; white-space: pre-wrap; font-family: monospace; font-size: 0.875rem; max-height: 300px; overflow-y: auto;">
+${response.content ? escapeHtml(response.content) : '<em style="color: var(--text-secondary);">No text response (tool calls only)</em>'}
+            </div>
+          </div>
+        `;
+
+        // Tool calls section
+        if (response.toolDetails && response.toolDetails.length > 0) {
+          html += `
+            <div style="margin-top: 1.5rem;">
+              <div style="color: #f59e0b; font-weight: 600; margin-bottom: 0.5rem;">Tool Calls (${response.toolDetails.length})</div>
+              <div style="display: flex; flex-direction: column; gap: 0.5rem;">
+                ${response.toolDetails.map(tool => {
+                  let toolInput = '';
+                  if (tool.name === 'Bash' && tool.input?.command) {
+                    toolInput = tool.input.command;
+                  } else if (tool.name === 'Read' && tool.input?.file_path) {
+                    toolInput = tool.input.file_path;
+                  } else if (tool.name === 'Grep' && tool.input?.pattern) {
+                    toolInput = `"${tool.input.pattern}"${tool.input.path ? ` in ${tool.input.path}` : ''}`;
+                  } else if (tool.name === 'Edit' && tool.input?.file_path) {
+                    toolInput = tool.input.file_path;
+                  } else if (tool.input) {
+                    toolInput = JSON.stringify(tool.input).slice(0, 100) + (JSON.stringify(tool.input).length > 100 ? '...' : '');
+                  }
+                  return `
+                    <div style="background: var(--bg-secondary); padding: 0.75rem; border-radius: 6px; border-left: 3px solid #f59e0b;">
+                      <div style="font-weight: 600; color: var(--text-primary);">${tool.name}</div>
+                      ${toolInput ? `<div style="font-family: monospace; font-size: 0.75rem; color: var(--text-secondary); margin-top: 0.25rem; word-break: break-all;">${escapeHtml(toolInput)}</div>` : ''}
+                    </div>
+                  `;
+                }).join('')}
+              </div>
+            </div>
+          `;
+        }
+
+        // Token usage
+        if (response.tokens) {
+          html += `
+            <div style="margin-top: 1rem; padding: 0.75rem; background: var(--bg-secondary); border-radius: 6px;">
+              <div style="display: grid; grid-template-columns: repeat(4, 1fr); gap: 1rem; text-align: center;">
+                <div>
+                  <div style="color: var(--text-secondary); font-size: 0.7rem;">Input</div>
+                  <div style="font-weight: 600;">${(response.tokens.input_tokens || 0).toLocaleString()}</div>
+                </div>
+                <div>
+                  <div style="color: var(--text-secondary); font-size: 0.7rem;">Output</div>
+                  <div style="font-weight: 600;">${(response.tokens.output_tokens || 0).toLocaleString()}</div>
+                </div>
+                <div>
+                  <div style="color: var(--text-secondary); font-size: 0.7rem;">Cache Read</div>
+                  <div style="font-weight: 600;">${(response.tokens.cache_read_input_tokens || 0).toLocaleString()}</div>
+                </div>
+                <div>
+                  <div style="color: var(--text-secondary); font-size: 0.7rem;">Cache Create</div>
+                  <div style="font-weight: 600;">${(response.tokens.cache_creation_input_tokens || 0).toLocaleString()}</div>
+                </div>
+              </div>
+            </div>
+          `;
+        }
+      }
+
+      document.getElementById('promptDetailContent').innerHTML = html;
+      document.getElementById('promptDetailModal').style.display = 'block';
+    }
+
+    function closePromptDetail() {
+      document.getElementById('promptDetailModal').style.display = 'none';
+    }
+
+    // Prompts search/filter event listeners
+    document.getElementById('promptSearch')?.addEventListener('input', () => {
+      if (data) {
+        const userPrompts = (data.stats.prompts || []).filter(p => p.type === 'user');
+        renderPromptsList(userPrompts);
+      }
+    });
+
+    document.getElementById('promptProjectFilter')?.addEventListener('change', () => {
+      if (data) {
+        const userPrompts = (data.stats.prompts || []).filter(p => p.type === 'user');
+        renderPromptsList(userPrompts);
+      }
+    });
+
+    document.getElementById('promptSourceFilter')?.addEventListener('change', () => {
+      if (data) {
+        const userPrompts = (data.stats.prompts || []).filter(p => p.type === 'user');
+        renderPromptsList(userPrompts);
+      }
+    });
+
+    // Close modal on click outside
+    document.getElementById('promptDetailModal')?.addEventListener('click', (e) => {
+      if (e.target.id === 'promptDetailModal') {
+        closePromptDetail();
+      }
+    });
+
+    function exportCSV() {
+      if (!data) { alert('Load data first'); return; }
+      const { stats } = data;
+
+      let csv = 'Date,Messages,Sessions,ToolCalls\n';
+      stats.dailyActivity.forEach(d => {
+        csv += `${d.date},${d.messageCount},${d.sessionCount},${d.toolCallCount}\n`;
+      });
+
+      download('claude-code-analytics.csv', csv);
+    }
+
+    function exportJSON() {
+      if (!data) { alert('Load data first'); return; }
+      download('claude-code-analytics.json', JSON.stringify(data.stats, null, 2));
+    }
+
+    function download(filename, content) {
+      const blob = new Blob([content], { type: 'text/plain' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = filename;
+      a.click();
+      URL.revokeObjectURL(url);
+    }
+
+    // ============================================
+    // DATE FILTERING FUNCTIONALITY
+    // ============================================
+
+    function setupDateFilters(stats) {
+      if (!stats.dailyActivity || stats.dailyActivity.length === 0) return;
+
+      // Get min and max dates from dailyActivity
+      const dates = stats.dailyActivity.map(d => d.date).sort();
+      const minDate = dates[0];
+      const maxDate = dates[dates.length - 1];
+
+      // Set date picker values and limits
+      const dateFrom = document.getElementById('dateFrom');
+      const dateTo = document.getElementById('dateTo');
+
+      dateFrom.min = minDate;
+      dateFrom.max = maxDate;
+      dateFrom.value = minDate;
+
+      dateTo.min = minDate;
+      dateTo.max = maxDate;
+      dateTo.value = maxDate;
+
+      // Update display
+      updateDateRangeDisplay(minDate, maxDate, dates.length);
+    }
+
+    function applyDateFilter() {
+      if (!originalData) {
+        alert('Please load data first');
+        return;
+      }
+
+      const fromDate = document.getElementById('dateFrom').value;
+      const toDate = document.getElementById('dateTo').value;
+
+      if (!fromDate || !toDate) {
+        alert('Please select both From and To dates');
+        return;
+      }
+
+      if (fromDate > toDate) {
+        alert('From date must be before To date');
+        return;
+      }
+
+      // Filter dailyActivity by date range
+      const filteredActivity = originalData.stats.dailyActivity.filter(d => {
+        return d.date >= fromDate && d.date <= toDate;
+      });
+
+      if (filteredActivity.length === 0) {
+        alert('No data in selected date range');
+        return;
+      }
+
+      // Aggregate dateMetrics for filtered date range
+      const filteredModelUsage = {};
+      let filteredApiCalls = 0;
+      const filteredToolUsage = {};
+
+      if (originalData.stats.dateMetrics) {
+        for (const [date, metrics] of Object.entries(originalData.stats.dateMetrics)) {
+          if (date >= fromDate && date <= toDate) {
+            filteredApiCalls += metrics.apiCalls || 0;
+
+            // Aggregate model usage
+            for (const [model, tokens] of Object.entries(metrics.models || {})) {
+              if (!filteredModelUsage[model]) {
+                filteredModelUsage[model] = {
+                  inputTokens: 0,
+                  outputTokens: 0,
+                  cacheReadInputTokens: 0,
+                  cacheCreationInputTokens: 0
+                };
+              }
+              filteredModelUsage[model].inputTokens += tokens.inputTokens || 0;
+              filteredModelUsage[model].outputTokens += tokens.outputTokens || 0;
+              filteredModelUsage[model].cacheReadInputTokens += tokens.cacheReadInputTokens || 0;
+              filteredModelUsage[model].cacheCreationInputTokens += tokens.cacheCreationInputTokens || 0;
+            }
+
+            // Aggregate tool usage
+            for (const [tool, count] of Object.entries(metrics.tools || {})) {
+              filteredToolUsage[tool] = (filteredToolUsage[tool] || 0) + count;
+            }
+          }
+        }
+      }
+
+      // Filter session details by date
+      const filteredSessionDetails = {};
+      if (originalData.stats.sessionDetails) {
+        for (const [sessionId, session] of Object.entries(originalData.stats.sessionDetails)) {
+          if (session.startTime) {
+            const sessionDate = session.startTime.slice(0, 10);
+            if (sessionDate >= fromDate && sessionDate <= toDate) {
+              filteredSessionDetails[sessionId] = session;
+            }
+          }
+        }
+      }
+
+      // Filter bash commands by date
+      const filteredBashCommands = (originalData.stats.bashCommands || []).filter(cmd => {
+        if (cmd.timestamp) {
+          const cmdDate = cmd.timestamp.slice(0, 10);
+          return cmdDate >= fromDate && cmdDate <= toDate;
+        }
+        return false;
+      });
+
+      // Filter history entries by session date (for Projects tab)
+      const filteredHistory = originalData.history.filter(h => {
+        const session = originalData.stats.sessionDetails[h.sessionId];
+        if (session && session.startTime) {
+          const sessionDate = session.startTime.slice(0, 10);
+          return sessionDate >= fromDate && sessionDate <= toDate;
+        }
+        return false;
+      });
+
+      // Filter prompts by date (for Prompts tab)
+      const filteredPrompts = (originalData.stats.prompts || []).filter(p => {
+        if (p.timestamp) {
+          const promptDate = p.timestamp.slice(0, 10);
+          return promptDate >= fromDate && promptDate <= toDate;
+        }
+        return false;
+      });
+
+      // Recalculate aggregates based on filtered data
+      const filteredStats = {
+        ...originalData.stats,
+        dailyActivity: filteredActivity,
+        totalSessions: filteredActivity.reduce((sum, d) => sum + d.sessionCount, 0),
+        totalMessages: filteredActivity.reduce((sum, d) => sum + d.messageCount, 0),
+        // Use filtered aggregates from dateMetrics
+        modelUsage: Object.keys(filteredModelUsage).length > 0 ? filteredModelUsage : originalData.stats.modelUsage,
+        totalApiCalls: filteredApiCalls,
+        toolUsage: Object.keys(filteredToolUsage).length > 0 ? filteredToolUsage : originalData.stats.toolUsage,
+        sessionDetails: filteredSessionDetails,
+        bashCommands: filteredBashCommands,
+        prompts: filteredPrompts,
+        // Keep dateMetrics for nested lookups
+        dateMetrics: originalData.stats.dateMetrics
+      };
+
+      // Update data and re-render (use filteredHistory for Projects tab)
+      data = { stats: filteredStats, history: filteredHistory };
+      renderDashboard();
+
+      // Update display
+      updateDateRangeDisplay(fromDate, toDate, filteredActivity.length);
+      document.getElementById('dataStatus').textContent = `Filtered: ${filteredStats.totalSessions} sessions, ${filteredStats.totalMessages.toLocaleString()} messages, ${filteredApiCalls} API calls`;
+    }
+
+    function resetDateFilter() {
+      if (!originalData) return;
+
+      // Restore original data
+      data = {
+        stats: JSON.parse(JSON.stringify(originalData.stats)),
+        history: [...originalData.history]
+      };
+
+      // Reset date pickers
+      setupDateFilters(originalData.stats);
+
+      // Re-render
+      renderDashboard();
+
+      const dates = originalData.stats.dailyActivity.map(d => d.date).sort();
+      document.getElementById('dataStatus').textContent = `Loaded: ${originalData.stats.totalSessions} sessions, ${originalData.stats.totalMessages.toLocaleString()} messages`;
+    }
+
+    function updateDateRangeDisplay(fromDate, toDate, dayCount) {
+      const display = document.getElementById('dateRangeDisplay');
+      display.innerHTML = `Showing <strong>${dayCount}</strong> day${dayCount !== 1 ? 's' : ''}: ${fromDate} to ${toDate}`;
+    }
+
+    // Toggle cache info section
+    function toggleCacheInfo() {
+      const section = document.getElementById('cacheEducation');
+      const button = document.getElementById('cacheInfoToggle');
+      if (section.style.display === 'none') {
+        section.style.display = 'block';
+        button.textContent = 'Hide Details';
+        updateSavingsHighlight();
+      } else {
+        section.style.display = 'none';
+        button.textContent = 'Show Details';
+      }
+    }
+
+    // Update personalized savings highlight
+    function updateSavingsHighlight() {
+      if (!data) {
+        document.getElementById('yourSavingsHighlight').innerHTML = `
+          <p style="color: var(--text-secondary); text-align: center;">Load your data to see personalized savings calculations.</p>
+        `;
+        return;
+      }
+
+      const cacheSavings = calculateCacheSavings(data.stats.modelUsage);
+      const savingsPercent = cacheSavings.costWithoutCache > 0
+        ? ((cacheSavings.savings / cacheSavings.costWithoutCache) * 100).toFixed(1)
+        : 0;
+
+      document.getElementById('yourSavingsHighlight').innerHTML = `
+        <h4 style="color: var(--success); margin-bottom: 1rem; font-size: 1rem; text-align: center;">Your Cache Savings Summary</h4>
+        <div style="display: grid; grid-template-columns: repeat(3, 1fr); gap: 1rem; text-align: center;">
+          <div>
+            <div style="color: var(--text-secondary); font-size: 0.75rem; margin-bottom: 0.25rem;">Cache Read Tokens</div>
+            <div style="font-size: 1.25rem; font-weight: 600;">${formatTokens(cacheSavings.totalCacheRead)}</div>
+          </div>
+          <div>
+            <div style="color: var(--text-secondary); font-size: 0.75rem; margin-bottom: 0.25rem;">Cache Hit Rate</div>
+            <div style="font-size: 1.25rem; font-weight: 600; color: var(--success);">${cacheSavings.cacheHitRate.toFixed(1)}%</div>
+          </div>
+          <div>
+            <div style="color: var(--text-secondary); font-size: 0.75rem; margin-bottom: 0.25rem;">Money Saved</div>
+            <div style="font-size: 1.25rem; font-weight: 600; color: var(--success);">$${cacheSavings.savings.toFixed(2)}</div>
+          </div>
+        </div>
+        <div style="margin-top: 1rem; padding-top: 1rem; border-top: 1px solid var(--border);">
+          <p style="color: var(--text-secondary); font-size: 0.85rem; text-align: center; line-height: 1.6;">
+            Without caching, your <strong style="color: var(--text-primary);">${formatTokens(cacheSavings.totalCacheRead)}</strong> cache read tokens
+            would have cost <strong style="color: var(--error);">$${(cacheSavings.totalCacheRead * 15 / 1000000).toFixed(2)}</strong> at full input price.<br>
+            With caching at $1.50/MTok, you only paid <strong style="color: var(--success);">$${(cacheSavings.totalCacheRead * 1.5 / 1000000).toFixed(2)}</strong> —
+            a <strong style="color: var(--success);">${savingsPercent}% reduction</strong>!
+          </p>
+        </div>
+      `;
+    }
+
+    // Initialize custom metrics display
+    renderCustomMetrics();
+
+    // ============================================
+    // BASH EXECUTION DETAILS FUNCTIONALITY
+    // ============================================
+
+    let bashData = null;
+    let bashCategoriesChart = null;
+    let gitOpsChart = null;
+
+    // Note: Bash commands are now parsed automatically during loadData()
+    // The old loadSessionLogs function has been removed
+
+    function processBashCommands(commands) {
+      const categories = {
+        'Git': 0,
+        'Package Managers': 0,
+        'File Operations': 0,
+        'Development': 0,
+        'Docker': 0,
+        'System': 0,
+        'Other': 0
+      };
+
+      const gitOps = {
+        'status': 0, 'add': 0, 'commit': 0, 'push': 0, 'pull': 0,
+        'log': 0, 'diff': 0, 'branch': 0, 'checkout': 0, 'other': 0
+      };
+
+      const commandTypes = {};
+      const purposes = {};
+
+      for (const cmd of commands) {
+        const firstWord = cmd.command.split(' ')[0].split('/').pop();
+
+        // Count command types
+        commandTypes[firstWord] = (commandTypes[firstWord] || 0) + 1;
+
+        // Count purposes
+        if (cmd.description) {
+          purposes[cmd.description] = (purposes[cmd.description] || 0) + 1;
+        }
+
+        // Categorize
+        if (firstWord === 'git') {
+          categories['Git']++;
+          const subCmd = cmd.command.split(' ')[1];
+          if (gitOps.hasOwnProperty(subCmd)) {
+            gitOps[subCmd]++;
+          } else {
+            gitOps['other']++;
+          }
+        } else if (['npm', 'pnpm', 'yarn', 'npx'].includes(firstWord)) {
+          categories['Package Managers']++;
+        } else if (['ls', 'find', 'mkdir', 'rm', 'cp', 'mv', 'cat', 'head', 'tail', 'touch'].includes(firstWord)) {
+          categories['File Operations']++;
+        } else if (['node', 'python', 'python3', 'ruby', 'curl', 'wget'].includes(firstWord)) {
+          categories['Development']++;
+        } else if (['docker', 'docker-compose'].includes(firstWord)) {
+          categories['Docker']++;
+        } else if (['cd', 'pwd', 'echo', 'which', 'env', 'export', 'source'].includes(firstWord)) {
+          categories['System']++;
+        } else {
+          categories['Other']++;
+        }
+      }
+
+      // Sort by count
+      const sortedTypes = Object.entries(commandTypes)
+        .sort((a, b) => b[1] - a[1])
+        .slice(0, 15);
+
+      const sortedPurposes = Object.entries(purposes)
+        .sort((a, b) => b[1] - a[1])
+        .slice(0, 10);
+
+      return {
+        total: commands.length,
+        categories,
+        gitOps,
+        commandTypes: sortedTypes,
+        purposes: sortedPurposes,
+        recentCommands: commands.slice(-50).reverse()
+      };
+    }
+
+    function renderBashDetails() {
+      if (!bashData) return;
+
+      // Summary stats
+      document.getElementById('bashDetailsContent').innerHTML = `
+        <div class="summary-cards" style="margin-bottom: 1rem;">
+          <div class="card">
+            <div class="card-title">Total Bash Commands</div>
+            <div class="card-value">${bashData.total.toLocaleString()}</div>
+          </div>
+          <div class="card">
+            <div class="card-title">Git Operations</div>
+            <div class="card-value">${bashData.categories['Git'].toLocaleString()}</div>
+          </div>
+          <div class="card">
+            <div class="card-title">Package Manager</div>
+            <div class="card-value">${bashData.categories['Package Managers'].toLocaleString()}</div>
+          </div>
+          <div class="card">
+            <div class="card-title">File Operations</div>
+            <div class="card-value">${bashData.categories['File Operations'].toLocaleString()}</div>
+          </div>
+        </div>
+
+        <div class="grid-2" style="margin-top: 1rem;">
+          <div>
+            <h4 style="margin-bottom: 0.75rem; color: var(--text-primary);">Top Commands</h4>
+            ${bashData.commandTypes.map(([cmd, count]) => `
+              <div class="metric-row">
+                <span class="metric-label"><code>${cmd}</code></span>
+                <span class="metric-value">${count}</span>
+              </div>
+            `).join('')}
+          </div>
+          <div>
+            <h4 style="margin-bottom: 0.75rem; color: var(--text-primary);">Common Purposes</h4>
+            ${bashData.purposes.map(([purpose, count]) => `
+              <div class="metric-row">
+                <span class="metric-label" style="font-size: 0.8rem;">${purpose}</span>
+                <span class="metric-value">${count}</span>
+              </div>
+            `).join('')}
+          </div>
+        </div>
+      `;
+
+      // Show and render charts
+      document.getElementById('bashChartsSection').style.display = 'grid';
+
+      // Categories chart
+      if (bashCategoriesChart) bashCategoriesChart.destroy();
+      const catCtx = document.getElementById('bashCategoriesChart').getContext('2d');
+      bashCategoriesChart = new Chart(catCtx, {
+        type: 'doughnut',
+        data: {
+          labels: Object.keys(bashData.categories),
+          datasets: [{
+            data: Object.values(bashData.categories),
+            backgroundColor: [
+              'rgba(99, 102, 241, 0.8)',   // Git - purple
+              'rgba(16, 185, 129, 0.8)',   // Package - green
+              'rgba(245, 158, 11, 0.8)',   // File - amber
+              'rgba(236, 72, 153, 0.8)',   // Dev - pink
+              'rgba(59, 130, 246, 0.8)',   // Docker - blue
+              'rgba(139, 92, 246, 0.8)',   // System - violet
+              'rgba(107, 114, 128, 0.8)'   // Other - gray
+            ],
+            borderColor: 'var(--bg-primary)',
+            borderWidth: 2
+          }]
+        },
+        options: {
+          responsive: true,
+          maintainAspectRatio: false,
+          plugins: {
+            legend: { position: 'bottom', labels: { color: '#94a3b8', font: { size: 11 } } }
+          }
+        }
+      });
+
+      // Git operations chart
+      if (gitOpsChart) gitOpsChart.destroy();
+      const gitCtx = document.getElementById('gitOpsChart').getContext('2d');
+      gitOpsChart = new Chart(gitCtx, {
+        type: 'bar',
+        data: {
+          labels: Object.keys(bashData.gitOps),
+          datasets: [{
+            label: 'Git Commands',
+            data: Object.values(bashData.gitOps),
+            backgroundColor: 'rgba(99, 102, 241, 0.8)'
+          }]
+        },
+        options: {
+          responsive: true,
+          maintainAspectRatio: false,
+          plugins: {
+            legend: { display: false }
+          },
+          scales: {
+            x: { ticks: { color: '#94a3b8' }, grid: { color: 'rgba(148, 163, 184, 0.1)' } },
+            y: { ticks: { color: '#94a3b8' }, grid: { color: 'rgba(148, 163, 184, 0.1)' } }
+          }
+        }
+      });
+
+      // Show recent commands table
+      document.getElementById('bashCommandsList').style.display = 'block';
+      document.getElementById('bashCommandsTable').innerHTML = `
+        <table style="width: 100%; font-size: 0.85rem;">
+          <thead>
+            <tr style="text-align: left; color: var(--text-secondary);">
+              <th style="padding: 0.5rem;">Command</th>
+              <th style="padding: 0.5rem;">Description</th>
+            </tr>
+          </thead>
+          <tbody>
+            ${bashData.recentCommands.slice(0, 25).map(cmd => `
+              <tr style="border-top: 1px solid var(--border);">
+                <td style="padding: 0.5rem; font-family: monospace; max-width: 400px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">
+                  ${escapeHtml(cmd.command.substring(0, 80))}${cmd.command.length > 80 ? '...' : ''}
+                </td>
+                <td style="padding: 0.5rem; color: var(--text-secondary);">${escapeHtml(cmd.description || '-')}</td>
+              </tr>
+            `).join('')}
+          </tbody>
+        </table>
+        <p style="color: var(--text-secondary); font-size: 0.75rem; margin-top: 0.5rem; text-align: center;">
+          Showing 25 of ${bashData.recentCommands.length} recent commands
+        </p>
+      `;
+    }
+
+    function escapeHtml(text) {
+      const div = document.createElement('div');
+      div.textContent = text;
+      return div.innerHTML;
+    }
+  </script>
+</body>
+</html>
