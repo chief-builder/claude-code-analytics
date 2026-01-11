@@ -1,0 +1,410 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Claude Code Analytics - Dashboard Screenshots</title>
+  <style>
+    :root {
+      --bg-primary: #0f172a;
+      --bg-secondary: #1e293b;
+      --bg-tertiary: #334155;
+      --text-primary: #f1f5f9;
+      --text-secondary: #94a3b8;
+      --accent: #6366f1;
+      --success: #10b981;
+    }
+
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+      background: var(--bg-primary);
+      color: var(--text-primary);
+      line-height: 1.6;
+      min-height: 100vh;
+    }
+
+    header {
+      background: var(--bg-secondary);
+      padding: 2rem;
+      text-align: center;
+      border-bottom: 1px solid var(--bg-tertiary);
+    }
+
+    h1 {
+      font-size: 2.5rem;
+      margin-bottom: 0.5rem;
+      color: var(--text-primary);
+    }
+
+    .subtitle {
+      color: var(--text-secondary);
+      font-size: 1.1rem;
+      margin-bottom: 1.5rem;
+    }
+
+    .buttons {
+      display: flex;
+      gap: 1rem;
+      justify-content: center;
+      flex-wrap: wrap;
+    }
+
+    .btn {
+      display: inline-block;
+      padding: 0.75rem 1.5rem;
+      border-radius: 8px;
+      text-decoration: none;
+      font-weight: 500;
+      transition: all 0.2s;
+    }
+
+    .btn-primary {
+      background: var(--accent);
+      color: white;
+    }
+
+    .btn-primary:hover {
+      background: #4f46e5;
+    }
+
+    .btn-secondary {
+      background: var(--bg-tertiary);
+      color: var(--text-primary);
+    }
+
+    .btn-secondary:hover {
+      background: #475569;
+    }
+
+    main {
+      max-width: 1400px;
+      margin: 0 auto;
+      padding: 2rem;
+    }
+
+    .intro {
+      text-align: center;
+      margin-bottom: 3rem;
+      padding: 2rem;
+      background: var(--bg-secondary);
+      border-radius: 12px;
+    }
+
+    .intro h2 {
+      color: var(--accent);
+      margin-bottom: 1rem;
+    }
+
+    .intro p {
+      color: var(--text-secondary);
+      max-width: 800px;
+      margin: 0 auto;
+    }
+
+    .features {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+      gap: 1rem;
+      margin-top: 1.5rem;
+    }
+
+    .feature {
+      background: var(--bg-tertiary);
+      padding: 1rem;
+      border-radius: 8px;
+      text-align: center;
+    }
+
+    .feature-icon {
+      font-size: 1.5rem;
+      margin-bottom: 0.5rem;
+    }
+
+    .gallery {
+      display: grid;
+      gap: 2rem;
+    }
+
+    .screenshot {
+      background: var(--bg-secondary);
+      border-radius: 12px;
+      overflow: hidden;
+      border: 1px solid var(--bg-tertiary);
+    }
+
+    .screenshot-header {
+      padding: 1rem 1.5rem;
+      border-bottom: 1px solid var(--bg-tertiary);
+      display: flex;
+      align-items: center;
+      gap: 1rem;
+    }
+
+    .tab-badge {
+      background: var(--accent);
+      color: white;
+      padding: 0.25rem 0.75rem;
+      border-radius: 4px;
+      font-size: 0.875rem;
+      font-weight: 500;
+    }
+
+    .screenshot-title {
+      font-size: 1.25rem;
+      font-weight: 600;
+    }
+
+    .screenshot-desc {
+      color: var(--text-secondary);
+      font-size: 0.875rem;
+      margin-left: auto;
+    }
+
+    .screenshot img {
+      width: 100%;
+      height: auto;
+      display: block;
+    }
+
+    .screenshot-caption {
+      padding: 1rem 1.5rem;
+      background: var(--bg-tertiary);
+    }
+
+    .screenshot-caption ul {
+      list-style: none;
+      display: flex;
+      flex-wrap: wrap;
+      gap: 0.5rem 1.5rem;
+    }
+
+    .screenshot-caption li {
+      color: var(--text-secondary);
+      font-size: 0.875rem;
+    }
+
+    .screenshot-caption li::before {
+      content: "•";
+      color: var(--success);
+      margin-right: 0.5rem;
+    }
+
+    footer {
+      text-align: center;
+      padding: 2rem;
+      color: var(--text-secondary);
+      border-top: 1px solid var(--bg-tertiary);
+      margin-top: 3rem;
+    }
+
+    footer a {
+      color: var(--accent);
+      text-decoration: none;
+    }
+
+    footer a:hover {
+      text-decoration: underline;
+    }
+
+    @media (max-width: 768px) {
+      h1 {
+        font-size: 1.75rem;
+      }
+
+      .screenshot-header {
+        flex-direction: column;
+        align-items: flex-start;
+        gap: 0.5rem;
+      }
+
+      .screenshot-desc {
+        margin-left: 0;
+      }
+    }
+  </style>
+</head>
+<body>
+  <header>
+    <h1>Claude Code Analytics</h1>
+    <p class="subtitle">A local dashboard for analyzing your Claude Code usage data</p>
+    <div class="buttons">
+      <a href="https://github.com/chief-builder/claude-code-analytics" class="btn btn-primary">View on GitHub</a>
+      <a href="claude-code-analytics.html" class="btn btn-secondary">Try the Dashboard</a>
+    </div>
+  </header>
+
+  <main>
+    <section class="intro">
+      <h2>Privacy-First Analytics</h2>
+      <p>All data stays local. Nothing is sent to any server. Simply load your ~/.claude directory and explore your usage patterns, token consumption, costs, and more.</p>
+      <div class="features">
+        <div class="feature">
+          <div class="feature-icon">📊</div>
+          <div>8 Dashboard Tabs</div>
+        </div>
+        <div class="feature">
+          <div class="feature-icon">🔒</div>
+          <div>100% Local</div>
+        </div>
+        <div class="feature">
+          <div class="feature-icon">📁</div>
+          <div>Single HTML File</div>
+        </div>
+        <div class="feature">
+          <div class="feature-icon">🎨</div>
+          <div>Dark Theme</div>
+        </div>
+      </div>
+    </section>
+
+    <div class="gallery">
+      <article class="screenshot">
+        <div class="screenshot-header">
+          <span class="tab-badge">Overview</span>
+          <span class="screenshot-title">Dashboard Overview</span>
+          <span class="screenshot-desc">At-a-glance metrics and activity charts</span>
+        </div>
+        <img src="screenshots/overview.png" alt="Overview Tab - Shows total sessions, messages, API calls, tool calls, and cost with daily activity and hourly distribution charts">
+        <div class="screenshot-caption">
+          <ul>
+            <li>Total sessions, messages, API calls</li>
+            <li>Cost calculated from tokens</li>
+            <li>Daily activity chart</li>
+            <li>Hourly distribution</li>
+          </ul>
+        </div>
+      </article>
+
+      <article class="screenshot">
+        <div class="screenshot-header">
+          <span class="tab-badge">Sessions</span>
+          <span class="screenshot-title">Session Analytics</span>
+          <span class="screenshot-desc">Session duration and message statistics</span>
+        </div>
+        <img src="screenshots/sessions.png" alt="Sessions Tab - Shows session counts, average duration, messages per session">
+        <div class="screenshot-caption">
+          <ul>
+            <li>Total sessions from logs</li>
+            <li>Average session duration</li>
+            <li>Messages per session</li>
+            <li>Sessions per day chart</li>
+          </ul>
+        </div>
+      </article>
+
+      <article class="screenshot">
+        <div class="screenshot-header">
+          <span class="tab-badge">Tokens</span>
+          <span class="screenshot-title">Token Usage & Costs</span>
+          <span class="screenshot-desc">Model breakdown and cache efficiency</span>
+        </div>
+        <img src="screenshots/tokens.png" alt="Tokens Tab - Shows input/output tokens, cache efficiency, and cost breakdown by model">
+        <div class="screenshot-caption">
+          <ul>
+            <li>Input/Output token counts</li>
+            <li>Cache read vs created</li>
+            <li>Cost breakdown by model</li>
+            <li>Cache savings analysis (82% saved!)</li>
+          </ul>
+        </div>
+      </article>
+
+      <article class="screenshot">
+        <div class="screenshot-header">
+          <span class="tab-badge">Tools</span>
+          <span class="screenshot-title">Tool Usage Patterns</span>
+          <span class="screenshot-desc">Which tools Claude Code uses most</span>
+        </div>
+        <img src="screenshots/tools.png" alt="Tools Tab - Shows tool calls over time and usage breakdown by tool type">
+        <div class="screenshot-caption">
+          <ul>
+            <li>Total tool calls with trends</li>
+            <li>Tools per session/message</li>
+            <li>Tool type distribution (Bash, Read, Edit...)</li>
+            <li>Peak usage days</li>
+          </ul>
+        </div>
+      </article>
+
+      <article class="screenshot">
+        <div class="screenshot-header">
+          <span class="tab-badge">Network</span>
+          <span class="screenshot-title">API & Network Stats</span>
+          <span class="screenshot-desc">API calls and data transfer estimates</span>
+        </div>
+        <img src="screenshots/network.png" alt="Network Tab - Shows API calls, data transferred, and request statistics">
+        <div class="screenshot-caption">
+          <ul>
+            <li>Total API calls from logs</li>
+            <li>Calls per day average</li>
+            <li>Data transfer estimates</li>
+            <li>API calls by model type</li>
+          </ul>
+        </div>
+      </article>
+
+      <article class="screenshot">
+        <div class="screenshot-header">
+          <span class="tab-badge">Prompts</span>
+          <span class="screenshot-title">Agent Loop Insights</span>
+          <span class="screenshot-desc">Understand how Claude Code works</span>
+        </div>
+        <img src="screenshots/prompts.png" alt="Prompts Tab - Shows model distribution, turn types, and conversation history">
+        <div class="screenshot-caption">
+          <ul>
+            <li>Model distribution (Opus/Sonnet/Haiku)</li>
+            <li>Turn type breakdown</li>
+            <li>Thinking rate percentage</li>
+            <li>Searchable conversation history</li>
+          </ul>
+        </div>
+      </article>
+
+      <article class="screenshot">
+        <div class="screenshot-header">
+          <span class="tab-badge">Projects</span>
+          <span class="screenshot-title">Project Breakdown</span>
+          <span class="screenshot-desc">Usage by project directory</span>
+        </div>
+        <img src="screenshots/projects.png" alt="Projects Tab - Shows session distribution across different projects">
+        <div class="screenshot-caption">
+          <ul>
+            <li>Sessions per project</li>
+            <li>Project activity breakdown</li>
+            <li>Date-filtered view</li>
+            <li>Project coverage percentage</li>
+          </ul>
+        </div>
+      </article>
+
+      <article class="screenshot">
+        <div class="screenshot-header">
+          <span class="tab-badge">Custom Metrics</span>
+          <span class="screenshot-title">Custom Metrics</span>
+          <span class="screenshot-desc">Define your own formulas</span>
+        </div>
+        <img src="screenshots/custom_metrics.png" alt="Custom Metrics Tab - Create user-defined metrics with custom formulas">
+        <div class="screenshot-caption">
+          <ul>
+            <li>User-defined formulas</li>
+            <li>Available variables list</li>
+            <li>Persists in localStorage</li>
+            <li>Example metric templates</li>
+          </ul>
+        </div>
+      </article>
+    </div>
+  </main>
+
+  <footer>
+    <p>Built with Claude Code | <a href="https://github.com/chief-builder/claude-code-analytics">GitHub Repository</a></p>
+    <p style="margin-top: 0.5rem; font-size: 0.875rem;">MIT License - Feel free to modify and distribute</p>
+  </footer>
+</body>
+</html>
