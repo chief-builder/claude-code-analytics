@@ -1,0 +1,397 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Claude Code: Turn-by-Turn Flow</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'SF Mono', 'Consolas', 'Monaco', monospace;
+            background: #0d1117;
+            min-height: 100vh;
+            padding: 30px;
+            color: #e6edf3;
+        }
+
+        .container {
+            max-width: 1100px;
+            margin: 0 auto;
+        }
+
+        .header {
+            text-align: center;
+            margin-bottom: 30px;
+        }
+
+        .header h1 {
+            font-size: 1.8rem;
+            color: #58a6ff;
+            margin-bottom: 8px;
+        }
+
+        .header .subtitle {
+            font-size: 1rem;
+            color: #8b949e;
+        }
+
+        .diagram {
+            background: #161b22;
+            border: 1px solid #30363d;
+            border-radius: 12px;
+            padding: 25px;
+            margin-bottom: 20px;
+        }
+
+        .diagram-title {
+            font-size: 0.9rem;
+            color: #8b949e;
+            margin-bottom: 20px;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+        }
+
+        .flow-container {
+            display: flex;
+            justify-content: space-between;
+            align-items: flex-start;
+            gap: 15px;
+            position: relative;
+        }
+
+        .column {
+            flex: 1;
+            text-align: center;
+        }
+
+        .column-header {
+            padding: 12px 8px;
+            border-radius: 8px;
+            margin-bottom: 15px;
+            font-weight: 600;
+            font-size: 0.85rem;
+        }
+
+        .user-header { background: #3d444d; color: #fff; }
+        .agent-header { background: #238636; color: #fff; }
+        .api-header { background: #1f6feb; color: #fff; }
+
+        .step {
+            background: #21262d;
+            border: 1px solid #30363d;
+            border-radius: 8px;
+            padding: 12px;
+            margin-bottom: 10px;
+            font-size: 0.8rem;
+            min-height: 60px;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            opacity: 0.3;
+            transition: all 0.5s ease;
+        }
+
+        .step.active {
+            opacity: 1;
+            border-color: #58a6ff;
+            box-shadow: 0 0 15px rgba(88, 166, 255, 0.3);
+        }
+
+        .step.completed {
+            opacity: 0.7;
+            border-color: #238636;
+        }
+
+        .step-num {
+            font-size: 0.7rem;
+            color: #58a6ff;
+            margin-bottom: 4px;
+        }
+
+        .step-text {
+            color: #e6edf3;
+            line-height: 1.4;
+        }
+
+        .step-code {
+            font-family: 'SF Mono', monospace;
+            font-size: 0.7rem;
+            color: #7ee787;
+            background: #161b22;
+            padding: 4px 8px;
+            border-radius: 4px;
+            margin-top: 6px;
+        }
+
+        .arrow-container {
+            position: absolute;
+            width: 100%;
+            height: 100%;
+            pointer-events: none;
+            top: 0;
+            left: 0;
+        }
+
+        .arrow {
+            position: absolute;
+            opacity: 0;
+            transition: opacity 0.3s ease;
+        }
+
+        .arrow.active {
+            opacity: 1;
+        }
+
+        .arrow svg {
+            overflow: visible;
+        }
+
+        .arrow path {
+            stroke: #58a6ff;
+            stroke-width: 2;
+            fill: none;
+            stroke-dasharray: 8 4;
+            animation: dash 0.5s linear infinite;
+        }
+
+        @keyframes dash {
+            to { stroke-dashoffset: -12; }
+        }
+
+        .legend {
+            display: flex;
+            justify-content: center;
+            gap: 30px;
+            margin-top: 20px;
+            padding-top: 20px;
+            border-top: 1px solid #30363d;
+        }
+
+        .legend-item {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            font-size: 0.8rem;
+        }
+
+        .legend-color {
+            width: 12px;
+            height: 12px;
+            border-radius: 3px;
+        }
+
+        .legend-local { background: #238636; }
+        .legend-haiku { background: #a371f7; }
+        .legend-opus { background: #1f6feb; }
+
+        .stats-bar {
+            display: flex;
+            justify-content: space-around;
+            background: #161b22;
+            border: 1px solid #30363d;
+            border-radius: 8px;
+            padding: 15px;
+            margin-bottom: 20px;
+        }
+
+        .stat {
+            text-align: center;
+        }
+
+        .stat-value {
+            font-size: 1.5rem;
+            font-weight: 700;
+            color: #58a6ff;
+        }
+
+        .stat-label {
+            font-size: 0.75rem;
+            color: #8b949e;
+        }
+
+        .current-step {
+            background: linear-gradient(90deg, #1f6feb, #a371f7);
+            color: #fff;
+            padding: 10px 20px;
+            border-radius: 8px;
+            text-align: center;
+            font-size: 0.9rem;
+            margin-bottom: 20px;
+            min-height: 45px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .footer {
+            text-align: center;
+            color: #484f58;
+            font-size: 0.75rem;
+            margin-top: 20px;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>Inside Claude Code: Turn-by-Turn Flow</h1>
+            <p class="subtitle">How each API round-trip works under the hood</p>
+        </div>
+
+        <div class="stats-bar">
+            <div class="stat">
+                <div class="stat-value">25</div>
+                <div class="stat-label">API Turns</div>
+            </div>
+            <div class="stat">
+                <div class="stat-value">99.2%</div>
+                <div class="stat-label">Cache Hit</div>
+            </div>
+            <div class="stat">
+                <div class="stat-value">42K</div>
+                <div class="stat-label">Tokens</div>
+            </div>
+            <div class="stat">
+                <div class="stat-value">119</div>
+                <div class="stat-label">Edits</div>
+            </div>
+        </div>
+
+        <div class="current-step" id="currentStep">
+            Step 1: User sends request to Claude Code
+        </div>
+
+        <div class="diagram">
+            <div class="flow-container">
+                <div class="column">
+                    <div class="column-header user-header">USER</div>
+                    <div class="step" id="step1">
+                        <div class="step-num">STEP 1</div>
+                        <div class="step-text">"Use warm colors for doc site..."</div>
+                    </div>
+                    <div class="step" id="step8">
+                        <div class="step-num">STEP 8</div>
+                        <div class="step-text">See response in terminal</div>
+                    </div>
+                </div>
+
+                <div class="column">
+                    <div class="column-header agent-header">CLAUDE CODE AGENT (LOCAL)</div>
+                    <div class="step" id="step2">
+                        <div class="step-num">STEP 2</div>
+                        <div class="step-text">Assemble HTTP request</div>
+                        <div class="step-code">system + tools + messages</div>
+                    </div>
+                    <div class="step" id="step5">
+                        <div class="step-num">STEP 5</div>
+                        <div class="step-text">Execute tools LOCALLY</div>
+                        <div class="step-code">Read, Edit, Bash, MCP...</div>
+                    </div>
+                    <div class="step" id="step6">
+                        <div class="step-num">STEP 6</div>
+                        <div class="step-text">Return tool_results</div>
+                        <div class="step-code">tool_use_id matching</div>
+                    </div>
+                </div>
+
+                <div class="column">
+                    <div class="column-header api-header">ANTHROPIC API (REMOTE)</div>
+                    <div class="step" id="step3">
+                        <div class="step-num">STEP 3</div>
+                        <div class="step-text">Haiku: Topic classification</div>
+                        <div class="step-code">"Doc site colors" (137 tokens)</div>
+                    </div>
+                    <div class="step" id="step4">
+                        <div class="step-num">STEP 4</div>
+                        <div class="step-text">Opus: Generate tool_use</div>
+                        <div class="step-code">thinking + text + tool calls</div>
+                    </div>
+                    <div class="step" id="step7">
+                        <div class="step-num">STEP 7</div>
+                        <div class="step-text">Opus: Process results</div>
+                        <div class="step-code">SSE streaming response</div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="legend">
+                <div class="legend-item">
+                    <div class="legend-color legend-local"></div>
+                    <span>LOCAL (your machine)</span>
+                </div>
+                <div class="legend-item">
+                    <div class="legend-color legend-haiku"></div>
+                    <span>Haiku (fast classify)</span>
+                </div>
+                <div class="legend-item">
+                    <div class="legend-color legend-opus"></div>
+                    <span>Opus (main reasoning)</span>
+                </div>
+            </div>
+        </div>
+
+        <div class="footer">
+            Captured via mitmproxy reverse proxy | Claude Code v2.1.12 | Opus 4.5
+        </div>
+    </div>
+
+    <script>
+        const steps = [
+            { id: 'step1', text: 'Step 1: User sends request to Claude Code agent' },
+            { id: 'step2', text: 'Step 2: Agent assembles HTTP request (system prompt + tools + message)' },
+            { id: 'step3', text: 'Step 3: Haiku classifies topic for terminal UI (137 tokens)' },
+            { id: 'step4', text: 'Step 4: Opus generates thinking block + decides tool calls' },
+            { id: 'step5', text: 'Step 5: Agent executes ALL tools locally (Read, Edit, Bash, MCP)' },
+            { id: 'step6', text: 'Step 6: Agent returns tool_results with matching IDs' },
+            { id: 'step7', text: 'Step 7: Opus processes results, may request more tools (LOOP)' },
+            { id: 'step8', text: 'Step 8: Final response displayed to user' }
+        ];
+
+        const currentStepEl = document.getElementById('currentStep');
+
+        function setStep(stepNum) {
+            // Reset all steps
+            steps.forEach((step, i) => {
+                const el = document.getElementById(step.id);
+                el.classList.remove('active', 'completed');
+                if (i < stepNum) {
+                    el.classList.add('completed');
+                } else if (i === stepNum) {
+                    el.classList.add('active');
+                }
+            });
+
+            // Update current step text
+            currentStepEl.textContent = steps[stepNum].text;
+        }
+
+        // Check URL for step parameter (e.g., ?step=0 for step 1)
+        const urlParams = new URLSearchParams(window.location.search);
+        const stepParam = urlParams.get('step');
+
+        if (stepParam !== null) {
+            // Manual mode: show specific step from URL
+            const stepNum = parseInt(stepParam, 10);
+            if (stepNum >= 0 && stepNum < steps.length) {
+                setStep(stepNum);
+            }
+        } else {
+            // Auto-animate mode (default)
+            let currentStepIndex = 0;
+
+            function updateStep() {
+                setStep(currentStepIndex);
+                currentStepIndex = (currentStepIndex + 1) % steps.length;
+            }
+
+            updateStep();
+            setInterval(updateStep, 2000);
+        }
+    </script>
+</body>
+</html>
